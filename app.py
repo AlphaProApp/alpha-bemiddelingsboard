@@ -5,7 +5,16 @@ from supabase import create_client
 
 
 KANDIDAAT_STATUSSEN = ["Actief", "Inactief", "Geplaatst", "Teruggetrokken"]
-AANBIEDING_STATUSSEN = ["open", "verstuurd", "intro", "afgewezen", "teruggetrokken"]
+AANBIEDING_STATUS_LABELS = {
+    "open": "Open / nog te versturen",
+    "verstuurd": "Verstuurd",
+    "intro": "Intro",
+    "afgewezen": "Afgewezen",
+    "teruggetrokken": "Teruggetrokken",
+    "mismatch": "Mismatch",
+    "nvt": "N.v.t.",
+}
+AANBIEDING_STATUSSEN = list(AANBIEDING_STATUS_LABELS.keys())
 
 
 st.set_page_config(page_title="Kandidaten Beheer", layout="wide")
@@ -58,6 +67,16 @@ def parse_optional_date(value):
     return date.fromisoformat(value)
 
 
+def aanbieding_status_label(status):
+    return AANBIEDING_STATUS_LABELS.get(status, status or "-")
+
+
+def aanbieding_status_index(status):
+    if status in AANBIEDING_STATUSSEN:
+        return AANBIEDING_STATUSSEN.index(status)
+    return AANBIEDING_STATUSSEN.index("open")
+
+
 def fetch_candidates(only_active=True, owner_id=None):
     query = (
         supabase()
@@ -101,20 +120,21 @@ def fetch_aanbiedingen(candidate_id):
     )
 
 
-def fetch_mijn_open_aanbiedingen(recruiter_id):
-    return (
+def fetch_mijn_aanbiedingen(recruiter_id, alleen_open=True):
+    query = (
         supabase()
         .table("aanbiedingen")
         .select(
             "*, candidate:kandidaten(naam), "
-            "created_by:recruiters!aanbiedingen_aangeboden_door_id_fkey(naam)"
+            "created_by:recruiters!aanbiedingen_aangeboden_door_id_fkey(naam), "
+            "sent_by:recruiters!aanbiedingen_sent_by_recruiter_id_fkey(naam)"
         )
         .eq("assigned_to_recruiter_id", recruiter_id)
-        .eq("status", "open")
         .order("created_at", desc=True)
-        .execute()
-        .data
     )
+    if alleen_open:
+        query = query.eq("status", "open")
+    return query.execute().data
 
 
 def fetch_alle_aanbiedingen():
@@ -275,6 +295,7 @@ def show_aanbieding_toevoegen(candidate_id, recruiters, current_recruiter):
     with st.form("aanbieding_toevoegen"):
         bedrijf = st.text_input("Bedrijf")
         contactpersoon = st.text_input("Contactpersoon")
+        tarief = st.text_input("Tarief")
         assigned_name = st.selectbox("Moet gedaan worden door", list(options.keys()))
         opmerking = st.text_area("Opmerking")
         submitted = st.form_submit_button("Toevoegen")
@@ -290,6 +311,7 @@ def show_aanbieding_toevoegen(candidate_id, recruiters, current_recruiter):
             "kandidaat_id": candidate_id,
             "bedrijf": bedrijf,
             "contactpersoon": contactpersoon,
+            "tarief": tarief,
             "status": "open",
             "assigned_to_recruiter_id": options[assigned_name],
             "aangeboden_door_id": current_recruiter["id"],
@@ -314,6 +336,21 @@ def update_aanbieding_status(aanbieding_id, status):
     supabase().table("aanbiedingen").update({"status": status}).eq("id", aanbieding_id).execute()
 
 
+def update_aanbieding_basis(aanbieding_id, contactpersoon, tarief, opmerking, status):
+    supabase().table("aanbiedingen").update(
+        {
+            "contactpersoon": contactpersoon,
+            "tarief": tarief,
+            "opmerking": opmerking,
+            "status": status,
+        }
+    ).eq("id", aanbieding_id).execute()
+
+
+def verwijder_aanbieding(aanbieding_id):
+    supabase().table("aanbiedingen").delete().eq("id", aanbieding_id).execute()
+
+
 def show_aanbieding_opmerking_editor(aanbieding):
     with st.expander("Opmerking aanpassen"):
         with st.form(f"opmerking-form-{aanbieding['id']}"):
@@ -321,6 +358,7 @@ def show_aanbieding_opmerking_editor(aanbieding):
                 "Contactpersoon",
                 value=aanbieding.get("contactpersoon") or "",
             )
+            tarief = st.text_input("Tarief", value=aanbieding.get("tarief") or "")
             opmerking = st.text_area("Opmerking", value=aanbieding.get("opmerking") or "")
             laatste_klantreactie = st.date_input(
                 "Laatste klantreactie",
@@ -336,6 +374,7 @@ def show_aanbieding_opmerking_editor(aanbieding):
             supabase().table("aanbiedingen").update(
                 {
                     "contactpersoon": contactpersoon,
+                    "tarief": tarief,
                     "opmerking": opmerking,
                     "laatste_klantreactie": (
                         laatste_klantreactie.isoformat() if laatste_klantreactie else None
@@ -355,10 +394,11 @@ def show_aanbiedingslijst(candidate_id, recruiters, current_recruiter):
         st.info("Nog geen bedrijven op de aanbiedingslijst.")
         return
 
-    header = st.columns([2, 2, 1, 2, 2, 2, 1, 2, 2, 3])
+    header = st.columns([2, 2, 1, 1, 2, 2, 2, 1, 2, 2, 3])
     labels = [
         "Bedrijf",
         "Contactpersoon",
+        "Tarief",
         "Status",
         "Moet gedaan worden door",
         "Aangemaakt door",
@@ -376,32 +416,49 @@ def show_aanbiedingslijst(candidate_id, recruiters, current_recruiter):
         created_by = aanbieding.get("created_by") or {}
         sent_by = aanbieding.get("sent_by") or {}
 
-        row = st.columns([2, 2, 1, 2, 2, 2, 1, 2, 2, 3])
+        row = st.columns([2, 2, 1, 1, 2, 2, 2, 1, 2, 2, 3])
         row[0].write(aanbieding.get("bedrijf") or "-")
         row[1].write(aanbieding.get("contactpersoon") or "-")
-        row[2].write(aanbieding.get("status") or "-")
-        row[3].write(
+        row[2].write(aanbieding.get("tarief") or "-")
+        row[3].write(aanbieding_status_label(aanbieding.get("status")))
+        row[4].write(
             assigned_to.get("naam")
             or recruiter_name(recruiters, aanbieding.get("assigned_to_recruiter_id"))
         )
-        row[4].write(created_by.get("naam") or recruiter_name(recruiters, aanbieding.get("aangeboden_door_id")))
-        row[5].write(sent_by.get("naam") or recruiter_name(recruiters, aanbieding.get("sent_by_recruiter_id")))
-        row[6].write(aanbieding.get("datum_verstuurd") or "-")
-        row[7].write(aanbieding.get("laatste_klantreactie") or "-")
-        row[8].write(aanbieding.get("opmerking") or "-")
+        row[5].write(created_by.get("naam") or recruiter_name(recruiters, aanbieding.get("aangeboden_door_id")))
+        row[6].write(sent_by.get("naam") or recruiter_name(recruiters, aanbieding.get("sent_by_recruiter_id")))
+        row[7].write(aanbieding.get("datum_verstuurd") or "-")
+        row[8].write(aanbieding.get("laatste_klantreactie") or "-")
+        row[9].write(aanbieding.get("opmerking") or "-")
 
-        with row[9]:
+        with row[10]:
             if aanbieding["status"] == "open":
                 if st.button("Markeer als verstuurd", key=f"verstuurd-{aanbieding['id']}"):
                     markeer_aanbieding_verstuurd(aanbieding["id"], current_recruiter)
                     st.success("Aanbieding gemarkeerd als verstuurd.")
                     st.rerun()
 
-            action_cols = st.columns(3)
-            for action_col, status in zip(action_cols, ["intro", "afgewezen", "teruggetrokken"]):
-                if action_col.button(status, key=f"{status}-{aanbieding['id']}"):
+            status_actions = ["intro", "afgewezen", "teruggetrokken", "mismatch", "nvt"]
+            for status in status_actions:
+                if st.button(
+                    aanbieding_status_label(status),
+                    key=f"{status}-{aanbieding['id']}",
+                ):
                     update_aanbieding_status(aanbieding["id"], status)
                     st.success("Status bijgewerkt.")
+                    st.rerun()
+
+            with st.expander("Verwijderen"):
+                st.warning("Dit verwijdert alleen deze aanbiedingregel, niet de kandidaat.")
+                confirm_key = f"confirm-delete-{aanbieding['id']}"
+                confirmed = st.checkbox("Ik weet het zeker", key=confirm_key)
+                if st.button(
+                    "Verwijder uit aanbiedingslijst",
+                    key=f"delete-{aanbieding['id']}",
+                    disabled=not confirmed,
+                ):
+                    verwijder_aanbieding(aanbieding["id"])
+                    st.success("Aanbiedingregel verwijderd.")
                     st.rerun()
 
         show_aanbieding_opmerking_editor(aanbieding)
@@ -424,31 +481,79 @@ def show_candidate_page(current_recruiter, recruiters):
     show_aanbiedingslijst(candidate_id, recruiters, current_recruiter)
 
 
+def show_mijn_aanbieding_acties(aanbieding, current_recruiter):
+    with st.form(f"mijn-aanbieding-form-{aanbieding['id']}"):
+        status = st.selectbox(
+            "Status",
+            AANBIEDING_STATUSSEN,
+            format_func=aanbieding_status_label,
+            index=aanbieding_status_index(aanbieding.get("status")),
+        )
+        contactpersoon = st.text_input(
+            "Contactpersoon",
+            value=aanbieding.get("contactpersoon") or "",
+        )
+        tarief = st.text_input("Tarief", value=aanbieding.get("tarief") or "")
+        opmerking = st.text_area("Opmerking", value=aanbieding.get("opmerking") or "")
+        submitted = st.form_submit_button("Opslaan")
+
+    if submitted:
+        update_aanbieding_basis(aanbieding["id"], contactpersoon, tarief, opmerking, status)
+        st.success("Aanbieding bijgewerkt.")
+        st.rerun()
+
+    action_cols = st.columns(2)
+    if action_cols[0].button("Markeer als verstuurd", key=f"mijn-verstuurd-{aanbieding['id']}"):
+        markeer_aanbieding_verstuurd(aanbieding["id"], current_recruiter)
+        st.success("Aanbieding gemarkeerd als verstuurd.")
+        st.rerun()
+
+    if action_cols[1].button("Open kandidaat", key=f"mijn-open-kandidaat-{aanbieding['id']}"):
+        st.session_state.candidate_id = aanbieding["kandidaat_id"]
+        st.session_state.view = "Kandidaatdetail"
+        st.rerun()
+
+    with st.expander("Verwijderen"):
+        st.warning("Dit verwijdert alleen deze aanbiedingregel, niet de kandidaat.")
+        confirmed = st.checkbox("Ik weet het zeker", key=f"mijn-confirm-delete-{aanbieding['id']}")
+        if st.button(
+            "Verwijder uit aanbiedingslijst",
+            key=f"mijn-delete-{aanbieding['id']}",
+            disabled=not confirmed,
+        ):
+            verwijder_aanbieding(aanbieding["id"])
+            st.success("Aanbiedingregel verwijderd.")
+            st.rerun()
+
+
 def show_mijn_open_aanbiedingen(current_recruiter):
     st.header("Mijn te versturen aanbiedingen")
-    aanbiedingen = fetch_mijn_open_aanbiedingen(current_recruiter["id"])
+    toon_alle_statussen = st.checkbox("Toon ook mijn niet-open aanbiedingen")
+    aanbiedingen = fetch_mijn_aanbiedingen(
+        current_recruiter["id"],
+        alleen_open=not toon_alle_statussen,
+    )
 
     if not aanbiedingen:
-        st.info("Je hebt geen open aanbiedingen om te versturen.")
+        st.info("Geen aanbiedingen gevonden.")
         return
 
     for aanbieding in aanbiedingen:
         candidate = aanbieding.get("candidate") or {}
         created_by = aanbieding.get("created_by") or {}
+        sent_by = aanbieding.get("sent_by") or {}
         with st.container(border=True):
-            cols = st.columns([2, 2, 2, 2])
+            cols = st.columns([2, 2, 2, 2, 2, 2])
             cols[0].write(f"**{aanbieding.get('bedrijf') or '-'}**")
             cols[1].write(f"Kandidaat: {candidate.get('naam') or '-'}")
-            cols[2].write(f"Aangemaakt door: {created_by.get('naam') or '-'}")
-            if cols[3].button("Markeer als verstuurd", key=f"mijn-verstuurd-{aanbieding['id']}"):
-                markeer_aanbieding_verstuurd(aanbieding["id"], current_recruiter)
-                st.success("Aanbieding gemarkeerd als verstuurd.")
-                st.rerun()
-
-            if st.button("Open kandidaat", key=f"mijn-open-kandidaat-{aanbieding['id']}"):
-                st.session_state.candidate_id = aanbieding["kandidaat_id"]
-                st.session_state.view = "Kandidaatdetail"
-                st.rerun()
+            cols[2].write(f"Status: {aanbieding_status_label(aanbieding.get('status'))}")
+            cols[3].write(f"Contactpersoon: {aanbieding.get('contactpersoon') or '-'}")
+            cols[4].write(f"Tarief: {aanbieding.get('tarief') or '-'}")
+            cols[5].write(f"Datum verstuurd: {aanbieding.get('datum_verstuurd') or '-'}")
+            st.write(f"**Aangemaakt door:** {created_by.get('naam') or '-'}")
+            st.write(f"**Verstuurd door:** {sent_by.get('naam') or '-'}")
+            st.write(f"**Opmerking:** {aanbieding.get('opmerking') or '-'}")
+            show_mijn_aanbieding_acties(aanbieding, current_recruiter)
 
 
 def count_by_recruiter(recruiters, aanbiedingen, field_name, status=None):
