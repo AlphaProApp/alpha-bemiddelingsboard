@@ -11,6 +11,23 @@ AANBIEDING_STATUSSEN = ["open", "verstuurd", "intro", "afgewezen", "teruggetrokk
 st.set_page_config(page_title="Kandidaten Beheer", layout="wide")
 
 
+def require_authentication():
+    if st.session_state.get("authenticated"):
+        return
+
+    st.title("Alpha Bemiddelingsboard")
+    password = st.text_input("Wachtwoord", type="password")
+
+    if st.button("Inloggen"):
+        if password == st.secrets["APP_PASSWORD"]:
+            st.session_state["authenticated"] = True
+            st.rerun()
+        else:
+            st.error("Onjuist wachtwoord")
+
+    st.stop()
+
+
 @st.cache_resource
 def get_supabase():
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
@@ -472,6 +489,8 @@ def show_dashboard(recruiters):
 
 
 def main():
+    require_authentication()
+
     st.title("Kandidaten Beheer")
 
     recruiters = fetch_recruiters()
