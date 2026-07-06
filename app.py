@@ -274,6 +274,7 @@ def show_aanbieding_toevoegen(candidate_id, recruiters, current_recruiter):
 
     with st.form("aanbieding_toevoegen"):
         bedrijf = st.text_input("Bedrijf")
+        contactpersoon = st.text_input("Contactpersoon")
         assigned_name = st.selectbox("Moet gedaan worden door", list(options.keys()))
         opmerking = st.text_area("Opmerking")
         submitted = st.form_submit_button("Toevoegen")
@@ -288,6 +289,7 @@ def show_aanbieding_toevoegen(candidate_id, recruiters, current_recruiter):
         {
             "kandidaat_id": candidate_id,
             "bedrijf": bedrijf,
+            "contactpersoon": contactpersoon,
             "status": "open",
             "assigned_to_recruiter_id": options[assigned_name],
             "aangeboden_door_id": current_recruiter["id"],
@@ -315,6 +317,10 @@ def update_aanbieding_status(aanbieding_id, status):
 def show_aanbieding_opmerking_editor(aanbieding):
     with st.expander("Opmerking aanpassen"):
         with st.form(f"opmerking-form-{aanbieding['id']}"):
+            contactpersoon = st.text_input(
+                "Contactpersoon",
+                value=aanbieding.get("contactpersoon") or "",
+            )
             opmerking = st.text_area("Opmerking", value=aanbieding.get("opmerking") or "")
             laatste_klantreactie = st.date_input(
                 "Laatste klantreactie",
@@ -329,6 +335,7 @@ def show_aanbieding_opmerking_editor(aanbieding):
         if submitted:
             supabase().table("aanbiedingen").update(
                 {
+                    "contactpersoon": contactpersoon,
                     "opmerking": opmerking,
                     "laatste_klantreactie": (
                         laatste_klantreactie.isoformat() if laatste_klantreactie else None
@@ -348,9 +355,10 @@ def show_aanbiedingslijst(candidate_id, recruiters, current_recruiter):
         st.info("Nog geen bedrijven op de aanbiedingslijst.")
         return
 
-    header = st.columns([2, 1, 2, 2, 2, 1, 2, 2, 3])
+    header = st.columns([2, 2, 1, 2, 2, 2, 1, 2, 2, 3])
     labels = [
         "Bedrijf",
+        "Contactpersoon",
         "Status",
         "Moet gedaan worden door",
         "Aangemaakt door",
@@ -368,20 +376,21 @@ def show_aanbiedingslijst(candidate_id, recruiters, current_recruiter):
         created_by = aanbieding.get("created_by") or {}
         sent_by = aanbieding.get("sent_by") or {}
 
-        row = st.columns([2, 1, 2, 2, 2, 1, 2, 2, 3])
+        row = st.columns([2, 2, 1, 2, 2, 2, 1, 2, 2, 3])
         row[0].write(aanbieding.get("bedrijf") or "-")
-        row[1].write(aanbieding.get("status") or "-")
-        row[2].write(
+        row[1].write(aanbieding.get("contactpersoon") or "-")
+        row[2].write(aanbieding.get("status") or "-")
+        row[3].write(
             assigned_to.get("naam")
             or recruiter_name(recruiters, aanbieding.get("assigned_to_recruiter_id"))
         )
-        row[3].write(created_by.get("naam") or recruiter_name(recruiters, aanbieding.get("aangeboden_door_id")))
-        row[4].write(sent_by.get("naam") or recruiter_name(recruiters, aanbieding.get("sent_by_recruiter_id")))
-        row[5].write(aanbieding.get("datum_verstuurd") or "-")
-        row[6].write(aanbieding.get("laatste_klantreactie") or "-")
-        row[7].write(aanbieding.get("opmerking") or "-")
+        row[4].write(created_by.get("naam") or recruiter_name(recruiters, aanbieding.get("aangeboden_door_id")))
+        row[5].write(sent_by.get("naam") or recruiter_name(recruiters, aanbieding.get("sent_by_recruiter_id")))
+        row[6].write(aanbieding.get("datum_verstuurd") or "-")
+        row[7].write(aanbieding.get("laatste_klantreactie") or "-")
+        row[8].write(aanbieding.get("opmerking") or "-")
 
-        with row[8]:
+        with row[9]:
             if aanbieding["status"] == "open":
                 if st.button("Markeer als verstuurd", key=f"verstuurd-{aanbieding['id']}"):
                     markeer_aanbieding_verstuurd(aanbieding["id"], current_recruiter)
@@ -513,13 +522,25 @@ def main():
 
     if "view" not in st.session_state:
         st.session_state.view = "Mijn Kandidaten"
+    if st.session_state.view not in menu_items:
+        st.session_state.view = "Mijn Kandidaten"
+    if "last_synced_view" not in st.session_state:
+        st.session_state.last_synced_view = st.session_state.view
+    if "menu_view" not in st.session_state:
+        st.session_state.menu_view = st.session_state.view
+    if st.session_state.view != st.session_state.last_synced_view:
+        st.session_state.menu_view = st.session_state.view
 
     st.sidebar.divider()
-    st.session_state.view = st.sidebar.radio(
+    st.sidebar.radio(
         "Menu",
         menu_items,
-        index=menu_items.index(st.session_state.view),
+        key="menu_view",
     )
+
+    if st.session_state.menu_view != st.session_state.view:
+        st.session_state.view = st.session_state.menu_view
+    st.session_state.last_synced_view = st.session_state.view
 
     if st.session_state.view == "Mijn Kandidaten":
         st.header("Mijn Kandidaten")
