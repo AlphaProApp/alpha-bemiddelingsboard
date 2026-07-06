@@ -4,7 +4,14 @@ import streamlit as st
 from supabase import create_client
 
 
-KANDIDAAT_STATUSSEN = ["Actief", "Inactief", "Geplaatst", "Teruggetrokken"]
+KANDIDAAT_STATUSSEN = [
+    "Actief",
+    "Kandidaten opslag",
+    "Inactief",
+    "Geplaatst",
+    "Teruggetrokken",
+    "Opgelost",
+]
 AANBIEDING_STATUS_LABELS = {
     "open": "Open / nog te versturen",
     "verstuurd": "Verstuurd",
@@ -77,15 +84,15 @@ def aanbieding_status_index(status):
     return AANBIEDING_STATUSSEN.index("open")
 
 
-def fetch_candidates(only_active=True, owner_id=None):
+def fetch_candidates(status=None, owner_id=None):
     query = (
         supabase()
         .table("kandidaten")
         .select("*, eigenaar:recruiters(naam)")
         .order("created_at", desc=True)
     )
-    if only_active:
-        query = query.eq("status", "Actief")
+    if status:
+        query = query.eq("status", status)
     if owner_id:
         query = query.eq("eigenaar_id", owner_id)
     return query.execute().data
@@ -101,6 +108,15 @@ def fetch_candidate(candidate_id):
         .execute()
         .data
     )
+
+
+def update_candidate_status(candidate_id, status):
+    supabase().table("kandidaten").update({"status": status}).eq("id", candidate_id).execute()
+
+
+def delete_candidate_with_aanbiedingen(candidate_id):
+    supabase().table("aanbiedingen").delete().eq("kandidaat_id", candidate_id).execute()
+    supabase().table("kandidaten").delete().eq("id", candidate_id).execute()
 
 
 def fetch_aanbiedingen(candidate_id):
@@ -251,7 +267,11 @@ def show_candidate_details(candidate, current_recruiter):
             status = st.selectbox(
                 "Status",
                 KANDIDAAT_STATUSSEN,
-                index=KANDIDAAT_STATUSSEN.index(candidate["status"]),
+                index=(
+                    KANDIDAAT_STATUSSEN.index(candidate["status"])
+                    if candidate["status"] in KANDIDAAT_STATUSSEN
+                    else 0
+                ),
             )
             cv_link = st.text_input("CV-link", value=candidate.get("cv_link") or "")
             submitted = st.form_submit_button("Kandidaat opslaan")
@@ -286,6 +306,38 @@ def show_candidate_details(candidate, current_recruiter):
 
     if candidate.get("cv_link"):
         st.link_button("CV openen", candidate["cv_link"])
+
+    st.subheader("Kandidaten opslag")
+    if candidate.get("status") == "Actief":
+        if st.button("Verplaats naar kandidaten opslag"):
+            update_candidate_status(candidate["id"], "Kandidaten opslag")
+            st.success("Kandidaat verplaatst naar Kandidaten opslag.")
+            st.session_state.view = "Kandidaten opslag"
+            st.rerun()
+    elif candidate.get("status") == "Kandidaten opslag":
+        if st.button("Terugzetten naar actieve kandidaten"):
+            update_candidate_status(candidate["id"], "Actief")
+            st.success("Kandidaat teruggezet naar Actieve kandidaten.")
+            st.session_state.view = "Actieve kandidaten"
+            st.rerun()
+
+    st.subheader("Gevaarlijke acties")
+    st.warning("Definitief verwijderen verwijdert ook alle gekoppelde aanbiedingen.")
+    confirmed = st.checkbox(
+        "Ik weet zeker dat ik deze kandidaat wil verwijderen",
+        key=f"delete-candidate-confirm-{candidate['id']}",
+    )
+    if confirmed and st.button("Definitief verwijderen", key=f"delete-candidate-{candidate['id']}"):
+        target_view = (
+            "Kandidaten opslag"
+            if candidate.get("status") == "Kandidaten opslag"
+            else "Actieve kandidaten"
+        )
+        delete_candidate_with_aanbiedingen(candidate["id"])
+        st.session_state.pop("candidate_id", None)
+        st.session_state.view = target_view
+        st.success("Kandidaat definitief verwijderd.")
+        st.rerun()
 
 
 def show_aanbieding_toevoegen(candidate_id, recruiters, current_recruiter):
@@ -617,18 +669,23 @@ def main():
     current_recruiter = next(r for r in recruiters if r["naam"] == selected_name)
 
     menu_items = [
-        "Mijn Kandidaten",
-        "Alle Kandidaten",
-        "Kandidaat toevoegen",
-        "Kandidaatdetail",
-        "Mijn te versturen aanbiedingen",
         "Dashboard",
+        "Mijn kandidaten",
+        "Actieve kandidaten",
+        "Kandidaten opslag",
+        "Mijn te versturen aanbiedingen",
+        "Kandidaat toevoegen",
     ]
+    valid_views = menu_items + ["Kandidaatdetail"]
 
     if "view" not in st.session_state:
-        st.session_state.view = "Mijn Kandidaten"
-    if st.session_state.view not in menu_items:
-        st.session_state.view = "Mijn Kandidaten"
+        st.session_state.view = "Mijn kandidaten"
+    if st.session_state.view == "Alle Kandidaten":
+        st.session_state.view = "Actieve kandidaten"
+    if st.session_state.view == "Mijn Kandidaten":
+        st.session_state.view = "Mijn kandidaten"
+    if st.session_state.view not in valid_views:
+        st.session_state.view = "Mijn kandidaten"
     if "last_synced_view" not in st.session_state:
         st.session_state.last_synced_view = st.session_state.view
     if "menu_view" not in st.session_state:
@@ -647,20 +704,23 @@ def main():
         st.session_state.view = st.session_state.menu_view
     st.session_state.last_synced_view = st.session_state.view
 
-    if st.session_state.view == "Mijn Kandidaten":
-        st.header("Mijn Kandidaten")
-        show_candidates_list(fetch_candidates(only_active=False, owner_id=current_recruiter["id"]))
-    elif st.session_state.view == "Alle Kandidaten":
-        st.header("Alle actieve kandidaten")
-        show_candidates_list(fetch_candidates(only_active=True))
+    if st.session_state.view == "Dashboard":
+        show_dashboard(recruiters)
+    elif st.session_state.view == "Mijn kandidaten":
+        st.header("Mijn kandidaten")
+        show_candidates_list(fetch_candidates(status="Actief", owner_id=current_recruiter["id"]))
+    elif st.session_state.view == "Actieve kandidaten":
+        st.header("Actieve kandidaten")
+        show_candidates_list(fetch_candidates(status="Actief"))
+    elif st.session_state.view == "Kandidaten opslag":
+        st.header("Kandidaten opslag")
+        show_candidates_list(fetch_candidates(status="Kandidaten opslag"))
+    elif st.session_state.view == "Mijn te versturen aanbiedingen":
+        show_mijn_open_aanbiedingen(current_recruiter)
     elif st.session_state.view == "Kandidaat toevoegen":
         show_add_candidate(current_recruiter)
     elif st.session_state.view == "Kandidaatdetail":
         show_candidate_page(current_recruiter, recruiters)
-    elif st.session_state.view == "Mijn te versturen aanbiedingen":
-        show_mijn_open_aanbiedingen(current_recruiter)
-    elif st.session_state.view == "Dashboard":
-        show_dashboard(recruiters)
 
 
 if __name__ == "__main__":
