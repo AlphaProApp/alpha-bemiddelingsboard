@@ -12,6 +12,34 @@ KANDIDAAT_STATUSSEN = [
     "Teruggetrokken",
     "Opgelost",
 ]
+ERVARING_BINNEN_OPTIES = [
+    "Engineer",
+    "Industrieel Monteur",
+    "Werkvoorbereider / Planner",
+    "Inkoper",
+    "Staffing / Overig",
+    "Logistiek",
+    "Productie",
+    "Manager",
+    "QESH / SHE",
+    "Monteur Utiliteit",
+    "HVAC / Koeltechniek",
+    "Overig",
+]
+REISAFSTAND_OPTIES = [
+    "1-15 minuten",
+    "15-30 minuten",
+    "30-45 minuten",
+    "45-60 minuten",
+    "60+ minuten",
+]
+WERKTIJDEN_OPTIES = [
+    "Dagdienst",
+    "2 Ploegen",
+    "3 Ploegen",
+    "4 Ploegen",
+    "5 Ploegen",
+]
 AANBIEDING_STATUS_LABELS = {
     "open": "Open / nog te versturen",
     "verstuurd": "Verstuurd",
@@ -72,6 +100,16 @@ def parse_optional_date(value):
     if isinstance(value, date):
         return value
     return date.fromisoformat(value)
+
+
+def split_csv(value):
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def join_csv(values):
+    return ", ".join(values)
 
 
 def aanbieding_status_label(status):
@@ -175,14 +213,16 @@ def show_candidates_list(candidates):
     for candidate in candidates:
         owner = candidate.get("eigenaar") or {}
         with st.container(border=True):
-            cols = st.columns([3, 2, 2, 2, 1])
+            cols = st.columns([3, 2, 2, 2, 2, 1])
             cols[0].subheader(candidate["naam"])
             cols[1].write(candidate.get("woonplaats") or "-")
-            cols[2].write(candidate.get("gezochte_functies") or "-")
-            cols[3].write(owner.get("naam") or "-")
-            if cols[4].button("Open", key=f"open-candidate-{candidate['id']}"):
-                st.session_state.candidate_id = candidate["id"]
-                st.session_state.view = "Kandidaatdetail"
+            cols[2].write(candidate.get("ervaring_binnen") or "-")
+            cols[3].write(candidate.get("reisafstand") or "-")
+            cols[4].write(owner.get("naam") or "-")
+            st.caption(f"Werktijden: {candidate.get('werktijden') or '-'}")
+            if cols[5].button("Open", key=f"open-candidate-{candidate['id']}"):
+                st.session_state["selected_candidate_id"] = candidate["id"]
+                st.session_state.view = "detail"
                 st.rerun()
 
 
@@ -194,6 +234,9 @@ def show_add_candidate(current_recruiter):
         woonplaats = st.text_input("Woonplaats")
         leeftijd = st.number_input("Leeftijd", min_value=0, max_value=100, value=0)
         opleiding = st.text_input("Opleiding")
+        ervaring_binnen = st.multiselect("Ervaring binnen", ERVARING_BINNEN_OPTIES)
+        reisafstand = st.selectbox("Reisafstand", [""] + REISAFSTAND_OPTIES)
+        werktijden = st.multiselect("Werktijden", WERKTIJDEN_OPTIES)
         gezochte_functies = st.text_input("Gezochte functie(s)")
         salarisindicatie = st.text_input("Salarisindicatie")
         tarief = st.text_input("Tarief")
@@ -216,6 +259,9 @@ def show_add_candidate(current_recruiter):
                 "woonplaats": woonplaats,
                 "leeftijd": leeftijd or None,
                 "opleiding": opleiding,
+                "ervaring_binnen": join_csv(ervaring_binnen),
+                "reisafstand": reisafstand or None,
+                "werktijden": join_csv(werktijden),
                 "gezochte_functies": gezochte_functies,
                 "salarisindicatie": salarisindicatie,
                 "tarief": tarief,
@@ -228,8 +274,8 @@ def show_add_candidate(current_recruiter):
         .execute()
     )
     st.success("Kandidaat toegevoegd.")
-    st.session_state.candidate_id = result.data[0]["id"]
-    st.session_state.view = "Kandidaatdetail"
+    st.session_state["selected_candidate_id"] = result.data[0]["id"]
+    st.session_state.view = "detail"
     st.rerun()
 
 
@@ -251,6 +297,24 @@ def show_candidate_details(candidate, current_recruiter):
                 value=candidate.get("leeftijd") or 0,
             )
             opleiding = st.text_input("Opleiding", value=candidate.get("opleiding") or "")
+            ervaring_binnen = st.multiselect(
+                "Ervaring binnen",
+                ERVARING_BINNEN_OPTIES,
+                default=[value for value in split_csv(candidate.get("ervaring_binnen")) if value in ERVARING_BINNEN_OPTIES],
+            )
+            reisafstand_value = candidate.get("reisafstand") or ""
+            reisafstand = st.selectbox(
+                "Reisafstand",
+                [""] + REISAFSTAND_OPTIES,
+                index=([""] + REISAFSTAND_OPTIES).index(reisafstand_value)
+                if reisafstand_value in [""] + REISAFSTAND_OPTIES
+                else 0,
+            )
+            werktijden = st.multiselect(
+                "Werktijden",
+                WERKTIJDEN_OPTIES,
+                default=[value for value in split_csv(candidate.get("werktijden")) if value in WERKTIJDEN_OPTIES],
+            )
             gezochte_functies = st.text_input(
                 "Gezochte functie(s)",
                 value=candidate.get("gezochte_functies") or "",
@@ -283,6 +347,9 @@ def show_candidate_details(candidate, current_recruiter):
                     "woonplaats": woonplaats,
                     "leeftijd": leeftijd or None,
                     "opleiding": opleiding,
+                    "ervaring_binnen": join_csv(ervaring_binnen),
+                    "reisafstand": reisafstand or None,
+                    "werktijden": join_csv(werktijden),
                     "gezochte_functies": gezochte_functies,
                     "salarisindicatie": salarisindicatie,
                     "tarief": tarief,
@@ -297,6 +364,9 @@ def show_candidate_details(candidate, current_recruiter):
         st.write("**Woonplaats:**", candidate.get("woonplaats") or "-")
         st.write("**Leeftijd:**", candidate.get("leeftijd") or "-")
         st.write("**Opleiding:**", candidate.get("opleiding") or "-")
+        st.write("**Ervaring binnen:**", candidate.get("ervaring_binnen") or "-")
+        st.write("**Reisafstand:**", candidate.get("reisafstand") or "-")
+        st.write("**Werktijden:**", candidate.get("werktijden") or "-")
         st.write("**Gezochte functie(s):**", candidate.get("gezochte_functies") or "-")
         st.write("**Salarisindicatie:**", candidate.get("salarisindicatie") or "-")
         st.write("**Tarief:**", candidate.get("tarief") or "-")
@@ -334,6 +404,7 @@ def show_candidate_details(candidate, current_recruiter):
             else "Actieve kandidaten"
         )
         delete_candidate_with_aanbiedingen(candidate["id"])
+        st.session_state.pop("selected_candidate_id", None)
         st.session_state.pop("candidate_id", None)
         st.session_state.view = target_view
         st.success("Kandidaat definitief verwijderd.")
@@ -517,7 +588,7 @@ def show_aanbiedingslijst(candidate_id, recruiters, current_recruiter):
 
 
 def show_candidate_page(current_recruiter, recruiters):
-    candidate_id = st.session_state.get("candidate_id")
+    candidate_id = st.session_state.get("selected_candidate_id") or st.session_state.get("candidate_id")
     if not candidate_id:
         st.info("Kies eerst een kandidaat uit de lijst.")
         return
@@ -561,8 +632,8 @@ def show_mijn_aanbieding_acties(aanbieding, current_recruiter):
         st.rerun()
 
     if action_cols[1].button("Open kandidaat", key=f"mijn-open-kandidaat-{aanbieding['id']}"):
-        st.session_state.candidate_id = aanbieding["kandidaat_id"]
-        st.session_state.view = "Kandidaatdetail"
+        st.session_state["selected_candidate_id"] = aanbieding["kandidaat_id"]
+        st.session_state.view = "detail"
         st.rerun()
 
     with st.expander("Verwijderen"):
@@ -676,7 +747,7 @@ def main():
         "Mijn te versturen aanbiedingen",
         "Kandidaat toevoegen",
     ]
-    valid_views = menu_items + ["Kandidaatdetail"]
+    valid_views = menu_items + ["detail"]
 
     if "view" not in st.session_state:
         st.session_state.view = "Mijn kandidaten"
@@ -684,14 +755,24 @@ def main():
         st.session_state.view = "Actieve kandidaten"
     if st.session_state.view == "Mijn Kandidaten":
         st.session_state.view = "Mijn kandidaten"
+    if st.session_state.view == "Kandidaatdetail":
+        st.session_state.view = "detail"
     if st.session_state.view not in valid_views:
         st.session_state.view = "Mijn kandidaten"
     if "last_synced_view" not in st.session_state:
         st.session_state.last_synced_view = st.session_state.view
     if "menu_view" not in st.session_state:
+        st.session_state.menu_view = (
+            st.session_state.view
+            if st.session_state.view in menu_items
+            else "Mijn kandidaten"
+        )
+    if st.session_state.menu_view not in menu_items:
+        st.session_state.menu_view = "Mijn kandidaten"
+    if st.session_state.view != st.session_state.last_synced_view and st.session_state.view in menu_items:
         st.session_state.menu_view = st.session_state.view
-    if st.session_state.view != st.session_state.last_synced_view:
-        st.session_state.menu_view = st.session_state.view
+    if "last_menu_view" not in st.session_state:
+        st.session_state.last_menu_view = st.session_state.menu_view
 
     st.sidebar.divider()
     st.sidebar.radio(
@@ -700,8 +781,11 @@ def main():
         key="menu_view",
     )
 
-    if st.session_state.menu_view != st.session_state.view:
+    if st.session_state.menu_view != st.session_state.last_menu_view:
         st.session_state.view = st.session_state.menu_view
+    elif st.session_state.view in menu_items and st.session_state.menu_view != st.session_state.view:
+        st.session_state.view = st.session_state.menu_view
+    st.session_state.last_menu_view = st.session_state.menu_view
     st.session_state.last_synced_view = st.session_state.view
 
     if st.session_state.view == "Dashboard":
@@ -719,7 +803,7 @@ def main():
         show_mijn_open_aanbiedingen(current_recruiter)
     elif st.session_state.view == "Kandidaat toevoegen":
         show_add_candidate(current_recruiter)
-    elif st.session_state.view == "Kandidaatdetail":
+    elif st.session_state.view == "detail":
         show_candidate_page(current_recruiter, recruiters)
 
 
