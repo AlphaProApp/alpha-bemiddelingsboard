@@ -53,5 +53,5 @@ create index if not exists offers_sent_by_recruiter_id_idx on offers(sent_by_rec
 create index if not exists offers_status_idx on offers(status);
 
 insert into recruiters (naam)
-values ('Andy'), ('Jay'), ('Recruiter 3')
+values ('Andy'), ('Jay')
 on conflict (naam) do nothing;
