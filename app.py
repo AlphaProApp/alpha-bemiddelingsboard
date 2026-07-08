@@ -100,40 +100,271 @@ VERBORGEN_RECRUITER_NAMEN = {"Recruiter 3"}
 
 st.set_page_config(page_title="Kandidaten Beheer", layout="wide")
 
-st.markdown(
-    """
-    <style>
-    .block-container { padding-top: 1.4rem; padding-bottom: 2rem; }
-    h1, h2, h3 { letter-spacing: 0; }
-    div[data-testid="stVerticalBlock"] { gap: 0.45rem; }
-    div[data-testid="stHorizontalBlock"] { gap: 0.65rem; }
-    div[data-testid="stExpander"] details { border-radius: 6px; }
-    div[data-testid="stExpander"] summary { font-size: 0.9rem; }
-    .crm-section {
-        border-top: 1px solid #e5e7eb;
-        padding-top: 0.85rem;
-        margin-top: 1rem;
-    }
-    .crm-row {
-        border-bottom: 1px solid #edf0f2;
-        padding: 0.35rem 0;
-        font-size: 0.9rem;
-    }
-    .crm-muted { color: #667085; font-size: 0.82rem; }
-    .crm-chip {
-        display: inline-block;
-        border: 1px solid #d0d5dd;
-        border-radius: 999px;
-        padding: 0.08rem 0.45rem;
-        font-size: 0.78rem;
-        font-weight: 600;
-        background: #f8fafc;
-        white-space: nowrap;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+def inject_custom_css():
+    st.markdown(
+        """
+        <style>
+        :root {
+            --crm-bg: #f3f5f8;
+            --crm-sidebar: #e7edf3;
+            --crm-surface: #ffffff;
+            --crm-surface-soft: #f8fafc;
+            --crm-border: #d8e0e8;
+            --crm-border-soft: #e7edf3;
+            --crm-text: #16202b;
+            --crm-muted: #667085;
+            --crm-accent: #9f1d2b;
+            --crm-accent-soft: #fff1f2;
+        }
+        header[data-testid="stHeader"] {
+            background: transparent;
+            height: 0;
+        }
+        header[data-testid="stHeader"] > div {
+            height: 0;
+        }
+        .stApp {
+            background: var(--crm-bg);
+            color: var(--crm-text);
+        }
+        .block-container {
+            padding-top: 0.55rem;
+            padding-bottom: 2rem;
+            max-width: 1500px;
+        }
+        h1, h2, h3 {
+            letter-spacing: 0;
+            color: #101828;
+            font-weight: 750;
+        }
+        h1 {
+            font-size: 1.72rem;
+            margin: 0 0 0.25rem 0;
+        }
+        h2 {
+            font-size: 1.22rem;
+            margin: 0.95rem 0 0.25rem 0;
+        }
+        h3 {
+            font-size: 1rem;
+            margin: 0.65rem 0 0.15rem 0;
+        }
+        .stCaption, caption, small {
+            color: var(--crm-muted);
+        }
+        div[data-testid="stVerticalBlock"] {
+            gap: 0.48rem;
+        }
+        div[data-testid="stHorizontalBlock"] {
+            gap: 0.68rem;
+            align-items: center;
+        }
+        section[data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #e8eef5 0%, #dde6ef 100%);
+            border-right: 1px solid #cbd6e2;
+        }
+        section[data-testid="stSidebar"] > div {
+            padding-top: 1.15rem;
+        }
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] p {
+            color: #263445;
+            font-weight: 600;
+        }
+        section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
+            background: #ffffff;
+            border-color: #c7d2df;
+            border-radius: 7px;
+            min-height: 2.1rem;
+        }
+        section[data-testid="stSidebar"] div[role="radiogroup"] {
+            background: rgba(255, 255, 255, 0.56);
+            border: 1px solid #cbd6e2;
+            border-radius: 9px;
+            padding: 0.35rem;
+        }
+        section[data-testid="stSidebar"] div[role="radiogroup"] label {
+            border-radius: 7px;
+            padding: 0.32rem 0.45rem;
+            margin: 0.06rem 0;
+            transition: background 120ms ease, color 120ms ease;
+        }
+        section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+            background: #ffffff;
+            border-left: 3px solid var(--crm-accent);
+            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+        }
+        section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {
+            color: var(--crm-accent);
+            font-weight: 750;
+        }
+        section[data-testid="stSidebar"] div[role="radiogroup"] [data-testid="stWidgetLabel"] {
+            display: none;
+        }
+        div[data-testid="stForm"],
+        div[data-testid="stExpander"] details,
+        div[data-testid="stTable"],
+        div[data-testid="stDataFrame"] {
+            background: var(--crm-surface);
+            border: 1px solid var(--crm-border-soft);
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.045);
+        }
+        div[data-testid="stForm"] {
+            padding: 0.85rem;
+        }
+        div[data-testid="stExpander"] summary {
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+        div[data-testid="stTable"] {
+            overflow: hidden;
+        }
+        div[data-testid="stTable"] table {
+            border-collapse: collapse;
+            font-size: 0.88rem;
+        }
+        div[data-testid="stTable"] thead tr th {
+            background: #f2f5f8;
+            color: #475467;
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            font-weight: 750;
+            border-bottom: 1px solid var(--crm-border);
+            padding: 0.42rem 0.55rem;
+        }
+        div[data-testid="stTable"] tbody tr td,
+        div[data-testid="stTable"] tbody tr th {
+            border-bottom: 1px solid var(--crm-border-soft);
+            padding: 0.42rem 0.55rem;
+            color: #243142;
+        }
+        div[data-testid="stTable"] tbody tr:hover {
+            background: #fbfcfe;
+        }
+        div.stButton > button,
+        div[data-testid="stFormSubmitButton"] > button {
+            min-height: 2rem;
+            min-width: 5.85rem;
+            padding: 0.28rem 0.75rem;
+            border-radius: 6px;
+            border-color: #cbd5e1;
+            background: #ffffff;
+            color: #233044;
+            white-space: nowrap;
+            font-size: 0.85rem;
+            font-weight: 700;
+            box-shadow: 0 1px 1px rgba(16, 24, 40, 0.035);
+        }
+        div.stButton > button:hover,
+        div[data-testid="stFormSubmitButton"] > button:hover {
+            border-color: var(--crm-accent);
+            color: var(--crm-accent);
+            background: #fffafa;
+        }
+        div.stButton > button p,
+        div[data-testid="stFormSubmitButton"] > button p {
+            white-space: nowrap;
+            overflow-wrap: normal;
+            word-break: keep-all;
+        }
+        div.stButton {
+            margin: 0.08rem 0;
+        }
+        input, textarea, div[data-baseweb="select"] > div {
+            border-radius: 7px !important;
+        }
+        div[data-testid="stMarkdownContainer"] p {
+            margin-bottom: 0.15rem;
+            line-height: 1.35;
+        }
+        .crm-section {
+            border-top: 1px solid var(--crm-border);
+            padding-top: 0.95rem;
+            margin-top: 1.05rem;
+        }
+        .crm-row {
+            border-top: 1px solid var(--crm-border-soft);
+            height: 1px;
+            margin: 0.38rem 0 0.32rem 0;
+        }
+        .crm-muted {
+            color: var(--crm-muted);
+            font-size: 0.82rem;
+        }
+        .crm-kpi-card {
+            background: var(--crm-surface);
+            border: 1px solid var(--crm-border-soft);
+            border-radius: 9px;
+            padding: 0.72rem 0.85rem;
+            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.045);
+            border-left: 3px solid var(--crm-accent);
+        }
+        .crm-kpi-label {
+            color: var(--crm-muted);
+            font-size: 0.76rem;
+            font-weight: 750;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 0.2rem;
+        }
+        .crm-kpi-value {
+            color: #111827;
+            font-size: 1.72rem;
+            line-height: 1.1;
+            font-weight: 800;
+        }
+        .crm-kpi-help {
+            color: var(--crm-muted);
+            font-size: 0.78rem;
+            margin-top: 0.25rem;
+        }
+        .crm-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            max-width: 100%;
+            border: 1px solid #d0d5dd;
+            border-radius: 999px;
+            padding: 0.12rem 0.55rem;
+            font-size: 0.74rem;
+            line-height: 1.2;
+            font-weight: 750;
+            background: #f8fafc;
+            color: #344054;
+            white-space: nowrap;
+        }
+        .crm-chip-open { background: #f8fafc; border-color: #d0d5dd; color: #344054; }
+        .crm-chip-verstuurd { background: #eef5f9; border-color: #c7d8e4; color: #24536d; }
+        .crm-chip-intro { background: #ecfdf3; border-color: #bbf7d0; color: #15803d; }
+        .crm-chip-latent { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+        .crm-chip-automatisch_afgewezen_langlopende_intro { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
+        .crm-chip-afgewezen,
+        .crm-chip-teruggetrokken { background: #fef2f2; border-color: #fecaca; color: #9f1239; }
+        .crm-chip-mismatch { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+        .crm-chip-nvt { background: #f3f4f6; border-color: #d1d5db; color: #4b5563; }
+        .crm-table-header p,
+        .crm-table-header strong {
+            color: #475467;
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        .crm-cell {
+            font-size: 0.88rem;
+            color: #1f2937;
+        }
+        .crm-cell p {
+            overflow-wrap: anywhere;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+inject_custom_css()
 
 
 def require_authentication():
@@ -690,7 +921,22 @@ def display_value(value):
 
 def status_badge(status):
     label = aanbieding_status_label(status)
-    return f'<span class="crm-chip">{label}</span>'
+    css_status = (status or "open").replace(" ", "_")
+    return f'<span class="crm-chip crm-chip-{css_status}">{label}</span>'
+
+
+def kpi_card(label, value, help_text=None):
+    help_html = f'<div class="crm-kpi-help">{help_text}</div>' if help_text else ""
+    st.markdown(
+        f"""
+        <div class="crm-kpi-card">
+            <div class="crm-kpi-label">{label}</div>
+            <div class="crm-kpi-value">{value}</div>
+            {help_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def selecteer_aanbieding(aanbieding_id):
@@ -879,7 +1125,7 @@ def show_aanbiedingslijst(candidate_id, recruiters, current_recruiter):
         st.info("Nog geen bedrijven op de aanbiedingslijst.")
         return
 
-    header = st.columns([1.5, 1.2, 0.8, 1, 1.2, 1.1, 1.1, 0.9, 1, 1.6, 1.5])
+    header = st.columns([1.45, 1.15, 0.75, 1, 1.1, 1.05, 1.05, 0.85, 0.95, 1.35, 2.15], gap="small")
     labels = [
         "Bedrijf",
         "Contactpersoon",
@@ -894,7 +1140,7 @@ def show_aanbiedingslijst(candidate_id, recruiters, current_recruiter):
         "Actie",
     ]
     for col, label in zip(header, labels):
-        col.markdown(f"**{label}**")
+        col.markdown(f'<div class="crm-table-header"><strong>{label}</strong></div>', unsafe_allow_html=True)
 
     for aanbieding in aanbiedingen:
         assigned_to = aanbieding.get("assigned_to") or {}
@@ -902,7 +1148,7 @@ def show_aanbiedingslijst(candidate_id, recruiters, current_recruiter):
         sent_by = aanbieding.get("sent_by") or {}
 
         st.markdown('<div class="crm-row"></div>', unsafe_allow_html=True)
-        row = st.columns([1.5, 1.2, 0.8, 1, 1.2, 1.1, 1.1, 0.9, 1, 1.6, 1.5])
+        row = st.columns([1.45, 1.15, 0.75, 1, 1.1, 1.05, 1.05, 0.85, 0.95, 1.35, 2.15], gap="small")
         row[0].write(display_value(aanbieding.get("bedrijf")))
         row[1].write(display_value(aanbieding.get("contactpersoon")))
         row[2].write(display_value(aanbieding.get("tarief")))
@@ -914,7 +1160,7 @@ def show_aanbiedingslijst(candidate_id, recruiters, current_recruiter):
         row[8].write(display_value(aanbieding.get("laatste_klantreactie")))
         row[9].write(display_value(aanbieding.get("opmerking")))
         with row[10]:
-            action_cols = st.columns(2)
+            action_cols = st.columns([1.25, 0.9], gap="small")
             if action_cols[0].button("Verstuurd", key=f"sent-row-detail-{aanbieding['id']}"):
                 markeer_aanbieding_verstuurd(aanbieding["id"], current_recruiter)
                 st.success("Aanbieding gemarkeerd als verstuurd.")
@@ -964,7 +1210,7 @@ def show_mijn_open_aanbiedingen(current_recruiter):
         st.info("Geen aanbiedingen gevonden.")
         return
 
-    header = st.columns([1.4, 1.4, 1, 1, 1.2, 1.2, 1, 1.5, 1.5])
+    header = st.columns([1.35, 1.35, 0.95, 1, 1.05, 1.05, 1, 1.35, 2.05], gap="small")
     labels = [
         "Bedrijf",
         "Kandidaat",
@@ -977,14 +1223,14 @@ def show_mijn_open_aanbiedingen(current_recruiter):
         "Actie",
     ]
     for col, label in zip(header, labels):
-        col.markdown(f"**{label}**")
+        col.markdown(f'<div class="crm-table-header"><strong>{label}</strong></div>', unsafe_allow_html=True)
 
     for aanbieding in aanbiedingen:
         candidate = aanbieding.get("candidate") or {}
         sent_by = aanbieding.get("sent_by") or {}
 
         st.markdown('<div class="crm-row"></div>', unsafe_allow_html=True)
-        row = st.columns([1.4, 1.4, 1, 1, 1.2, 1.2, 1, 1.5, 1.5])
+        row = st.columns([1.35, 1.35, 0.95, 1, 1.05, 1.05, 1, 1.35, 2.05], gap="small")
         row[0].write(display_value(aanbieding.get("bedrijf")))
         row[1].write(display_value(candidate.get("naam")))
         row[2].markdown(status_badge(aanbieding.get("status")), unsafe_allow_html=True)
@@ -994,7 +1240,7 @@ def show_mijn_open_aanbiedingen(current_recruiter):
         row[6].write(display_value(display_recruiter_name(sent_by.get("naam"))))
         row[7].write(display_value(aanbieding.get("opmerking")))
         with row[8]:
-            action_cols = st.columns(2)
+            action_cols = st.columns([1.25, 0.9], gap="small")
             if action_cols[0].button("Verstuurd", key=f"sent-row-mijn-{aanbieding['id']}"):
                 markeer_aanbieding_verstuurd(aanbieding["id"], current_recruiter)
                 st.success("Aanbieding gemarkeerd als verstuurd.")
@@ -1057,15 +1303,16 @@ def show_dashboard(recruiters):
         week_start,
         week_end,
     )
-    st.metric("Totaal deze week", sum(week_counts.values()))
-    st.caption(
-        f"Weekperiode: {week_start.strftime('%d-%m-%Y %H:%M')} t/m {week_end.strftime('%d-%m-%Y %H:%M')}"
+    kpi_card(
+        "Totaal deze week",
+        sum(week_counts.values()),
+        f"{week_start.strftime('%d-%m-%Y %H:%M')} t/m {week_end.strftime('%d-%m-%Y %H:%M')}",
     )
     st.table([{"Recruiter": name, "Aantal": count} for name, count in week_counts.items()])
 
     st.subheader("Intro's")
     actuele_intros = [aanbieding for aanbieding in aanbiedingen if aanbieding.get("status") in INTRO_STATUSSEN]
-    st.metric("Totaal actuele intro's", len(actuele_intros))
+    kpi_card("Totaal actuele intro's", len(actuele_intros))
     st.table(
         [
             {
@@ -1096,8 +1343,11 @@ def show_dashboard(recruiters):
         month_end,
         statuses=INTRO_STATUSSEN,
     )
-    st.metric("Totaal aanbiedingen deze maand", sum(month_offer_counts.values()))
-    st.metric("Totaal intro's deze maand", sum(month_intro_counts.values()))
+    month_kpis = st.columns(2)
+    with month_kpis[0]:
+        kpi_card("Totaal aanbiedingen deze maand", sum(month_offer_counts.values()))
+    with month_kpis[1]:
+        kpi_card("Totaal intro's deze maand", sum(month_intro_counts.values()))
     st.table(
         [
             {
