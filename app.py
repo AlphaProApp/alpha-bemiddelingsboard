@@ -94,6 +94,15 @@ AANBIEDING_STATUS_LABELS = {
 }
 AANBIEDING_STATUSSEN = list(AANBIEDING_STATUS_LABELS.keys())
 INTRO_STATUSSEN = ["intro", "latent", "automatisch_afgewezen_langlopende_intro"]
+INTRO_STATUS_LABELS = {
+    "eerste_gesprek": "1e Gesprek",
+    "tweede_gesprek_meeloopdag": "2e Gesprek / Meeloopdag",
+    "intro_afgewezen": "Afgewezen",
+    "kandidaat_teruggetrokken": "Kandidaat teruggetrokken",
+    "geplaatst": "Geplaatst",
+}
+INTRO_STATUSSEN_OPTIES = list(INTRO_STATUS_LABELS.keys())
+ACTIEVE_INTRO_STATUSSEN = ["eerste_gesprek", "tweede_gesprek_meeloopdag", None]
 APP_TZ = ZoneInfo("Europe/Amsterdam")
 VERBORGEN_RECRUITER_NAMEN = {"Recruiter 3"}
 
@@ -475,11 +484,29 @@ def aanbieding_status_index(status):
     return AANBIEDING_STATUSSEN.index("open")
 
 
+def intro_status_label(status):
+    return INTRO_STATUS_LABELS.get(status, status or "-")
+
+
+def intro_status_index(status):
+    if status in INTRO_STATUSSEN_OPTIES:
+        return INTRO_STATUSSEN_OPTIES.index(status)
+    return INTRO_STATUSSEN_OPTIES.index("eerste_gesprek")
+
+
+def is_intro_related_status(status):
+    return status in INTRO_STATUSSEN
+
+
+def is_active_intro_for_aging(intro_status):
+    return intro_status in ACTIEVE_INTRO_STATUSSEN
+
+
 def run_intro_status_updates():
     aanbiedingen = (
         supabase()
         .table("aanbiedingen")
-        .select("id, status, datum_intro")
+        .select("id, status, datum_intro, intro_status")
         .in_("status", ["intro", "latent"])
         .execute()
         .data
@@ -487,6 +514,9 @@ def run_intro_status_updates():
     today = today_amsterdam()
 
     for aanbieding in aanbiedingen:
+        if not is_active_intro_for_aging(aanbieding.get("intro_status")):
+            continue
+
         datum_intro = parse_optional_date(aanbieding.get("datum_intro"))
         if not datum_intro:
             continue
@@ -861,7 +891,7 @@ def markeer_aanbieding_verstuurd(aanbieding_id, current_recruiter):
     ).eq("id", aanbieding_id).execute()
 
 
-def update_aanbieding_status(aanbieding_id, status, datum_intro=None):
+def update_aanbieding_status(aanbieding_id, status, datum_intro=None, intro_status=None):
     if status == "intro" and not datum_intro:
         return False
 
@@ -871,6 +901,8 @@ def update_aanbieding_status(aanbieding_id, status, datum_intro=None):
             updates["datum_intro"] = datum_intro.isoformat()
         else:
             updates["datum_intro"] = datum_intro
+    if status == "intro" and intro_status:
+        updates["intro_status"] = intro_status
     supabase().table("aanbiedingen").update(updates).eq("id", aanbieding_id).execute()
     return True
 
@@ -896,19 +928,24 @@ def update_aanbieding_details(
     datum_intro=None,
     laatste_klantreactie=None,
     opvolgdatum=None,
+    intro_status=None,
 ):
-    supabase().table("aanbiedingen").update(
-        {
-            "contactpersoon": contactpersoon,
-            "tarief": tarief,
-            "opmerking": opmerking,
-            "status": status,
-            "datum_verstuurd": datum_verstuurd,
-            "datum_intro": datum_intro,
-            "laatste_klantreactie": laatste_klantreactie,
-            "opvolgdatum": opvolgdatum,
-        }
-    ).eq("id", aanbieding_id).execute()
+    updates = {
+        "contactpersoon": contactpersoon,
+        "tarief": tarief,
+        "opmerking": opmerking,
+        "status": status,
+        "datum_verstuurd": datum_verstuurd,
+        "datum_intro": datum_intro,
+        "laatste_klantreactie": laatste_klantreactie,
+        "opvolgdatum": opvolgdatum,
+    }
+    if is_intro_related_status(status):
+        updates["intro_status"] = intro_status or "eerste_gesprek"
+    else:
+        updates["intro_status"] = None
+
+    supabase().table("aanbiedingen").update(updates).eq("id", aanbieding_id).execute()
 
 
 def verwijder_aanbieding(aanbieding_id):
@@ -954,12 +991,18 @@ def show_intro_planning_form(aanbieding, key_prefix):
             "Datum Intro",
             value=parse_optional_date(aanbieding.get("datum_intro")) or today_amsterdam(),
         )
+        intro_status = st.selectbox(
+            "Introstatus",
+            INTRO_STATUSSEN_OPTIES,
+            format_func=intro_status_label,
+            index=intro_status_index(aanbieding.get("intro_status")),
+        )
         form_cols = st.columns([1, 1, 3])
         opslaan = form_cols[0].form_submit_button("Intro opslaan")
         annuleren = form_cols[1].form_submit_button("Annuleren")
 
     if opslaan:
-        update_aanbieding_status(aanbieding["id"], "intro", datum_intro=datum_intro)
+        update_aanbieding_status(aanbieding["id"], "intro", datum_intro=datum_intro, intro_status=intro_status)
         st.session_state.pop("intro_planning_offer_id", None)
         st.success("Intro opgeslagen.")
         st.rerun()
@@ -1010,9 +1053,9 @@ def show_aanbieding_actiepanel(aanbieding, current_recruiter, key_prefix, includ
         show_intro_planning_form(aanbieding, key_prefix)
 
     with st.form(f"{key_prefix}-edit-{aanbieding['id']}"):
-        edit_cols = st.columns(5)
+        edit_cols = st.columns(4)
         status = edit_cols[0].selectbox(
-            "Status",
+            "Aanbiedingstatus",
             AANBIEDING_STATUSSEN,
             format_func=aanbieding_status_label,
             index=aanbieding_status_index(aanbieding.get("status")),
@@ -1026,13 +1069,24 @@ def show_aanbieding_actiepanel(aanbieding, current_recruiter, key_prefix, includ
             "Datum verstuurd",
             value=parse_optional_date(aanbieding.get("datum_verstuurd")),
         )
-        datum_intro = edit_cols[4].date_input(
-            "Datum Intro",
-            value=(
-                parse_optional_date(aanbieding.get("datum_intro"))
-                or (today_amsterdam() if aanbieding.get("status") in INTRO_STATUSSEN else None)
-            ),
-        )
+        datum_intro = None
+        intro_status = None
+        if is_intro_related_status(status) or aanbieding.get("datum_intro"):
+            intro_cols = st.columns(2)
+            datum_intro = intro_cols[0].date_input(
+                "Datum Intro",
+                value=(
+                    parse_optional_date(aanbieding.get("datum_intro"))
+                    or (today_amsterdam() if is_intro_related_status(status) else None)
+                ),
+            )
+            if is_intro_related_status(status):
+                intro_status = intro_cols[1].selectbox(
+                    "Introstatus",
+                    INTRO_STATUSSEN_OPTIES,
+                    format_func=intro_status_label,
+                    index=intro_status_index(aanbieding.get("intro_status")),
+                )
         datum_cols = st.columns(2)
         laatste_klantreactie = datum_cols[0].date_input(
             "Laatste klantreactie",
@@ -1046,7 +1100,7 @@ def show_aanbieding_actiepanel(aanbieding, current_recruiter, key_prefix, includ
         submitted = st.form_submit_button("Opslaan")
 
     if submitted:
-        if status in INTRO_STATUSSEN and not datum_intro:
+        if is_intro_related_status(status) and not datum_intro:
             st.error("Kies eerst een Datum Intro.")
             return
 
@@ -1060,6 +1114,7 @@ def show_aanbieding_actiepanel(aanbieding, current_recruiter, key_prefix, includ
             datum_intro.isoformat() if datum_intro else None,
             laatste_klantreactie.isoformat() if laatste_klantreactie else None,
             opvolgdatum.isoformat() if opvolgdatum else None,
+            intro_status,
         )
         st.success("Aanbieding bijgewerkt.")
         st.rerun()
@@ -1111,6 +1166,7 @@ def show_aanbieding_opmerking_editor(aanbieding):
                 aanbieding.get("datum_intro"),
                 laatste_klantreactie.isoformat() if laatste_klantreactie else None,
                 opvolgdatum.isoformat() if opvolgdatum else None,
+                aanbieding.get("intro_status"),
             )
             st.success("Aanbieding bijgewerkt.")
             st.rerun()
@@ -1311,7 +1367,13 @@ def show_dashboard(recruiters):
     st.table([{"Recruiter": name, "Aantal": count} for name, count in week_counts.items()])
 
     st.subheader("Intro's")
-    actuele_intros = [aanbieding for aanbieding in aanbiedingen if aanbieding.get("status") in INTRO_STATUSSEN]
+    actuele_intros = [
+        aanbieding
+        for aanbieding in aanbiedingen
+        if aanbieding.get("status") in INTRO_STATUSSEN
+        and aanbieding.get("datum_intro")
+        and is_active_intro_for_aging(aanbieding.get("intro_status"))
+    ]
     kpi_card("Totaal actuele intro's", len(actuele_intros))
     st.table(
         [
@@ -1319,7 +1381,8 @@ def show_dashboard(recruiters):
                 "Naam kandidaat": (aanbieding.get("candidate") or {}).get("naam") or "-",
                 "Naam klant": aanbieding.get("bedrijf") or "-",
                 "Datum Intro": aanbieding.get("datum_intro") or "-",
-                "Status": aanbieding_status_label(aanbieding.get("status")),
+                "Introstatus": intro_status_label(aanbieding.get("intro_status")),
+                "Aanbiedingstatus": aanbieding_status_label(aanbieding.get("status")),
             }
             for aanbieding in actuele_intros
         ]
