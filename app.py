@@ -406,23 +406,6 @@ def inject_custom_css():
 inject_custom_css()
 
 
-def require_authentication():
-    if st.session_state.get("authenticated"):
-        return
-
-    st.title("Alpha Bemiddelingsboard")
-    password = st.text_input("Wachtwoord", type="password")
-
-    if st.button("Inloggen"):
-        if password == st.secrets["APP_PASSWORD"]:
-            st.session_state["authenticated"] = True
-            st.rerun()
-        else:
-            st.error("Onjuist wachtwoord")
-
-    st.stop()
-
-
 @st.cache_resource
 def get_supabase():
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
@@ -435,6 +418,52 @@ def supabase():
 def fetch_recruiters():
     recruiters = supabase().table("recruiters").select("*").order("naam").execute().data
     return [recruiter for recruiter in recruiters if is_visible_recruiter(recruiter)]
+
+
+def require_recruiter_login(recruiters):
+    logged_in_recruiter_id = st.session_state.get("logged_in_recruiter_id")
+    current_recruiter = next(
+        (recruiter for recruiter in recruiters if recruiter["id"] == logged_in_recruiter_id),
+        None,
+    )
+    if current_recruiter:
+        return current_recruiter
+
+    st.title("Alpha Bemiddelingsboard")
+    st.subheader("Inloggen")
+
+    recruiter_options_list = [recruiter["naam"] for recruiter in recruiters]
+    selected_name = st.selectbox("Gebruiker / recruiter", recruiter_options_list)
+    login_code = st.text_input("Wachtwoord of pincode", type="password")
+
+    if st.button("Inloggen"):
+        selected_recruiter = next(
+            recruiter for recruiter in recruiters if recruiter["naam"] == selected_name
+        )
+        expected_code = selected_recruiter.get("login_code")
+        if expected_code and login_code == expected_code:
+            st.session_state["logged_in_recruiter_id"] = selected_recruiter["id"]
+            st.session_state["logged_in_recruiter_name"] = selected_recruiter["naam"]
+            st.session_state["logged_in_is_manager"] = bool(selected_recruiter.get("is_manager"))
+            st.rerun()
+        else:
+            st.error("Onjuiste code")
+
+    st.stop()
+
+
+def logout_recruiter():
+    for key in [
+        "logged_in_recruiter_id",
+        "logged_in_recruiter_name",
+        "logged_in_is_manager",
+        "selected_candidate_id",
+        "candidate_id",
+        "selected_offer_id",
+        "intro_planning_offer_id",
+    ]:
+        st.session_state.pop(key, None)
+    st.rerun()
 
 
 def is_visible_recruiter(recruiter):
@@ -1536,18 +1565,17 @@ def show_dashboard(recruiters):
 
 
 def main():
-    require_authentication()
-
-    st.title("Kandidaten Beheer")
-
     recruiters = fetch_recruiters()
     if not recruiters:
         st.error("Geen recruiters gevonden. Draai eerst het database-schema in Supabase.")
         return
 
-    recruiter_names = [r["naam"] for r in recruiters]
-    selected_name = st.sidebar.selectbox("Recruiter", recruiter_names)
-    current_recruiter = next(r for r in recruiters if r["naam"] == selected_name)
+    current_recruiter = require_recruiter_login(recruiters)
+
+    st.title("Kandidaten Beheer")
+    st.sidebar.markdown(f"**Ingelogd als:** {current_recruiter['naam']}")
+    if st.sidebar.button("Uitloggen"):
+        logout_recruiter()
 
     run_intro_status_updates()
 
