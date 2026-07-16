@@ -114,16 +114,21 @@ def inject_custom_css():
         """
         <style>
         :root {
-            --crm-bg: #f3f5f8;
-            --crm-sidebar: #e7edf3;
+            --crm-bg: #f3f6f8;
+            --crm-sidebar: #e3eaf0;
             --crm-surface: #ffffff;
-            --crm-surface-soft: #f8fafc;
-            --crm-border: #d8e0e8;
-            --crm-border-soft: #e7edf3;
-            --crm-text: #16202b;
-            --crm-muted: #667085;
-            --crm-accent: #9f1d2b;
-            --crm-accent-soft: #fff1f2;
+            --crm-surface-soft: #f7f9fb;
+            --crm-border: #d4dde5;
+            --crm-border-soft: #e1e7ed;
+            --crm-text: #18384a;
+            --crm-heading: #163247;
+            --crm-muted: #627282;
+            --crm-steel: #a9b4be;
+            --crm-accent: #5faf8f;
+            --crm-accent-strong: #33846b;
+            --crm-accent-soft: #edf8f3;
+            --crm-danger: #a33a3a;
+            --crm-danger-soft: #fff5f5;
         }
         header[data-testid="stHeader"] {
             background: transparent;
@@ -137,13 +142,13 @@ def inject_custom_css():
             color: var(--crm-text);
         }
         .block-container {
-            padding-top: 0.55rem;
+            padding-top: 0.65rem;
             padding-bottom: 2rem;
             max-width: 1500px;
         }
         h1, h2, h3 {
             letter-spacing: 0;
-            color: #101828;
+            color: var(--crm-heading);
             font-weight: 750;
         }
         h1 {
@@ -169,46 +174,91 @@ def inject_custom_css():
             align-items: center;
         }
         section[data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #e8eef5 0%, #dde6ef 100%);
-            border-right: 1px solid #cbd6e2;
+            background: var(--crm-sidebar);
+            border-right: 1px solid #c3ced8;
         }
         section[data-testid="stSidebar"] > div {
             padding-top: 1.15rem;
         }
+        .alpha-sidebar-brand {
+            border-bottom: 1px solid #c3ced8;
+            margin: 0 0 0.85rem 0;
+            padding: 0 0 0.75rem 0;
+        }
+        .alpha-sidebar-kicker {
+            color: var(--crm-heading);
+            font-size: 0.86rem;
+            font-weight: 850;
+            letter-spacing: 0.08em;
+        }
+        .alpha-sidebar-subtitle {
+            color: #667786;
+            font-size: 0.78rem;
+            font-weight: 650;
+            margin-top: 0.08rem;
+        }
+        .alpha-sidebar-accent {
+            width: 2.2rem;
+            height: 3px;
+            background: var(--crm-accent);
+            border-radius: 999px;
+            margin-top: 0.42rem;
+        }
         section[data-testid="stSidebar"] label,
         section[data-testid="stSidebar"] p {
-            color: #263445;
+            color: var(--crm-heading);
             font-weight: 600;
         }
         section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
             background: #ffffff;
-            border-color: #c7d2df;
-            border-radius: 7px;
+            border-color: #c3ced8;
+            border-radius: 6px;
             min-height: 2.1rem;
         }
-        section[data-testid="stSidebar"] div[role="radiogroup"] {
-            background: rgba(255, 255, 255, 0.56);
-            border: 1px solid #cbd6e2;
-            border-radius: 9px;
-            padding: 0.35rem;
+        .sidebar-menu-label {
+            color: #667786;
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin: 0.7rem 0 0.18rem 0;
         }
-        section[data-testid="stSidebar"] div[role="radiogroup"] label {
-            border-radius: 7px;
-            padding: 0.32rem 0.45rem;
-            margin: 0.06rem 0;
-            transition: background 120ms ease, color 120ms ease;
+        .consultant-card-label {
+            color: #667786;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin: 0 0 0.05rem 0;
+            padding-top: 0.05rem;
         }
-        section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        .consultant-card-name {
+            color: var(--crm-heading);
+            font-size: 0.98rem;
+            font-weight: 800;
+            line-height: 1.8rem;
+            margin-bottom: 0;
+        }
+        .consultant-sidebar-separator {
+            border-bottom: 1px solid #c3ced8;
+            margin-bottom: 0.64rem;
+            padding-bottom: 0.66rem;
+        }
+        section[data-testid="stSidebar"] div.stButton > button {
+            min-height: 1.65rem;
+            min-width: 0;
+            padding: 0.12rem 0.48rem;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.58);
+            border-color: #b8c3cd;
+            color: var(--crm-heading);
+            box-shadow: none;
+            font-size: 0.78rem;
+        }
+        section[data-testid="stSidebar"] div.stButton > button:hover {
             background: #ffffff;
-            border-left: 3px solid var(--crm-accent);
-            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
-        }
-        section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {
-            color: var(--crm-accent);
-            font-weight: 750;
-        }
-        section[data-testid="stSidebar"] div[role="radiogroup"] [data-testid="stWidgetLabel"] {
-            display: none;
+            border-color: var(--crm-accent);
+            color: var(--crm-heading);
         }
         div[data-testid="stForm"],
         div[data-testid="stExpander"] details,
@@ -216,11 +266,11 @@ def inject_custom_css():
         div[data-testid="stDataFrame"] {
             background: var(--crm-surface);
             border: 1px solid var(--crm-border-soft);
-            border-radius: 8px;
-            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.045);
+            border-radius: 7px;
+            box-shadow: 0 1px 2px rgba(22, 50, 71, 0.04);
         }
         div[data-testid="stForm"] {
-            padding: 0.85rem;
+            padding: 0.9rem;
         }
         div[data-testid="stExpander"] summary {
             font-size: 0.9rem;
@@ -234,8 +284,8 @@ def inject_custom_css():
             font-size: 0.88rem;
         }
         div[data-testid="stTable"] thead tr th {
-            background: #f2f5f8;
-            color: #475467;
+            background: #edf2f5;
+            color: var(--crm-heading);
             font-size: 0.76rem;
             text-transform: uppercase;
             letter-spacing: 0.02em;
@@ -247,30 +297,41 @@ def inject_custom_css():
         div[data-testid="stTable"] tbody tr th {
             border-bottom: 1px solid var(--crm-border-soft);
             padding: 0.42rem 0.55rem;
-            color: #243142;
+            color: var(--crm-text);
         }
         div[data-testid="stTable"] tbody tr:hover {
-            background: #fbfcfe;
+            background: #f9fbfc;
         }
         div.stButton > button,
         div[data-testid="stFormSubmitButton"] > button {
-            min-height: 2rem;
-            min-width: 5.85rem;
-            padding: 0.28rem 0.75rem;
-            border-radius: 6px;
-            border-color: #cbd5e1;
+            min-height: 1.95rem;
+            min-width: 4.85rem;
+            padding: 0.25rem 0.72rem;
+            border-radius: 5px;
+            border-color: #b8c3cd;
             background: #ffffff;
-            color: #233044;
+            color: var(--crm-heading);
             white-space: nowrap;
             font-size: 0.85rem;
             font-weight: 700;
-            box-shadow: 0 1px 1px rgba(16, 24, 40, 0.035);
+            box-shadow: 0 1px 1px rgba(22, 50, 71, 0.03);
+            transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+        }
+        div[data-testid="stFormSubmitButton"] > button {
+            background: var(--crm-heading);
+            border-color: var(--crm-heading);
+            color: #ffffff;
         }
         div.stButton > button:hover,
         div[data-testid="stFormSubmitButton"] > button:hover {
             border-color: var(--crm-accent);
-            color: var(--crm-accent);
-            background: #fffafa;
+            color: var(--crm-heading);
+            background: var(--crm-accent-soft);
+        }
+        div[data-testid="stFormSubmitButton"] > button:hover {
+            border-color: var(--crm-accent-strong);
+            background: var(--crm-accent-strong);
+            color: #ffffff;
         }
         div.stButton > button p,
         div[data-testid="stFormSubmitButton"] > button p {
@@ -282,7 +343,12 @@ def inject_custom_css():
             margin: 0.08rem 0;
         }
         input, textarea, div[data-baseweb="select"] > div {
-            border-radius: 7px !important;
+            border-radius: 6px !important;
+            border-color: #cbd5df !important;
+        }
+        input:focus, textarea:focus {
+            border-color: var(--crm-accent) !important;
+            box-shadow: 0 0 0 1px rgba(95, 175, 143, 0.12) !important;
         }
         div[data-testid="stMarkdownContainer"] p {
             margin-bottom: 0.15rem;
@@ -311,13 +377,13 @@ def inject_custom_css():
             font-size: 1.02rem;
         }
         .crm-panel-title {
-            color: #111827;
+            color: var(--crm-heading);
             font-size: 1.02rem;
             font-weight: 800;
             margin-bottom: 0.35rem;
         }
         .crm-subsection-title {
-            color: #344054;
+            color: var(--crm-heading);
             font-size: 0.78rem;
             font-weight: 800;
             letter-spacing: 0.02em;
@@ -326,18 +392,18 @@ def inject_custom_css():
             text-transform: uppercase;
         }
         .crm-subcard {
-            background: #f8fafc;
+            background: var(--crm-surface-soft);
             border: 1px solid var(--crm-border-soft);
-            border-radius: 8px;
+            border-radius: 7px;
             padding: 0.72rem 0.8rem;
             margin: 0.35rem 0 0.55rem 0;
         }
         .crm-kpi-card {
             background: var(--crm-surface);
             border: 1px solid var(--crm-border-soft);
-            border-radius: 9px;
+            border-radius: 7px;
             padding: 0.72rem 0.85rem;
-            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.045);
+            box-shadow: 0 1px 2px rgba(22, 50, 71, 0.04);
             border-left: 3px solid var(--crm-accent);
         }
         .crm-kpi-label {
@@ -349,7 +415,7 @@ def inject_custom_css():
             margin-bottom: 0.2rem;
         }
         .crm-kpi-value {
-            color: #111827;
+            color: var(--crm-heading);
             font-size: 1.72rem;
             line-height: 1.1;
             font-weight: 800;
@@ -370,29 +436,29 @@ def inject_custom_css():
             font-size: 0.74rem;
             line-height: 1.2;
             font-weight: 750;
-            background: #f8fafc;
-            color: #344054;
+            background: #f7f9fb;
+            color: var(--crm-heading);
             white-space: nowrap;
         }
-        .crm-chip-open { background: #f8fafc; border-color: #d0d5dd; color: #344054; }
-        .crm-chip-verstuurd { background: #eef5f9; border-color: #c7d8e4; color: #24536d; }
-        .crm-chip-intro { background: #ecfdf3; border-color: #bbf7d0; color: #15803d; }
-        .crm-chip-latent { background: #fffbeb; border-color: #fde68a; color: #92400e; }
-        .crm-chip-automatisch_afgewezen_langlopende_intro { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
+        .crm-chip-open { background: #f7f9fb; border-color: #cfd8e1; color: #3d4d5c; }
+        .crm-chip-verstuurd { background: #eef5f8; border-color: #c7d7e1; color: #1d5369; }
+        .crm-chip-intro { background: var(--crm-accent-soft); border-color: #b8dece; color: #25765f; }
+        .crm-chip-latent { background: #fbf8ef; border-color: #e8dcb5; color: #765d21; }
+        .crm-chip-automatisch_afgewezen_langlopende_intro { background: #fbf0f0; border-color: #e4c3c3; color: #8b3131; }
         .crm-chip-afgewezen,
-        .crm-chip-teruggetrokken { background: #fef2f2; border-color: #fecaca; color: #9f1239; }
-        .crm-chip-mismatch { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
-        .crm-chip-nvt { background: #f3f4f6; border-color: #d1d5db; color: #4b5563; }
+        .crm-chip-teruggetrokken { background: #fbf0f0; border-color: #e4c3c3; color: #8b3131; }
+        .crm-chip-mismatch { background: #fbf5ed; border-color: #e5d0b9; color: #7f5630; }
+        .crm-chip-nvt { background: #f1f3f5; border-color: #ccd3da; color: #52606d; }
         .crm-table-header p,
         .crm-table-header strong {
-            color: #475467;
+            color: var(--crm-heading);
             font-size: 0.76rem;
             text-transform: uppercase;
             letter-spacing: 0.02em;
         }
         .crm-cell {
             font-size: 0.88rem;
-            color: #1f2937;
+            color: var(--crm-text);
         }
         .crm-cell p {
             overflow-wrap: anywhere;
@@ -433,7 +499,7 @@ def require_recruiter_login(recruiters):
     st.subheader("Inloggen")
 
     recruiter_options_list = [recruiter["naam"] for recruiter in recruiters]
-    selected_name = st.selectbox("Gebruiker / recruiter", recruiter_options_list)
+    selected_name = st.selectbox("Consultant", recruiter_options_list)
     login_code = st.text_input("Wachtwoord of pincode", type="password")
 
     if st.button("Inloggen"):
@@ -1489,7 +1555,7 @@ def show_dashboard(recruiters):
 
     st.subheader("Openstaande Aanbiedingen")
     open_counts = count_by_recruiter(recruiters, aanbiedingen, "assigned_to_recruiter_id", "open")
-    st.table([{"Recruiter": name, "Aantal": count} for name, count in open_counts.items()])
+    st.table([{"Consultant": name, "Aantal": count} for name, count in open_counts.items()])
 
     st.subheader("Aanbiedingen deze week")
     week_counts = count_by_recruiter_in_window(
@@ -1505,7 +1571,7 @@ def show_dashboard(recruiters):
         sum(week_counts.values()),
         f"{week_start.strftime('%d-%m-%Y %H:%M')} t/m {week_end.strftime('%d-%m-%Y %H:%M')}",
     )
-    st.table([{"Recruiter": name, "Aantal": count} for name, count in week_counts.items()])
+    st.table([{"Consultant": name, "Aantal": count} for name, count in week_counts.items()])
 
     st.subheader("Intro's")
     actuele_intros = [
@@ -1555,7 +1621,7 @@ def show_dashboard(recruiters):
     st.table(
         [
             {
-                "Recruiter": recruiter["naam"],
+                "Consultant": recruiter["naam"],
                 "Totale aanbiedingen deze maand": month_offer_counts.get(recruiter["naam"], 0),
                 "Intro's deze maand": month_intro_counts.get(recruiter["naam"], 0),
             }
@@ -1567,15 +1633,31 @@ def show_dashboard(recruiters):
 def main():
     recruiters = fetch_recruiters()
     if not recruiters:
-        st.error("Geen recruiters gevonden. Draai eerst het database-schema in Supabase.")
+        st.error("Geen consultants gevonden. Draai eerst het database-schema in Supabase.")
         return
 
     current_recruiter = require_recruiter_login(recruiters)
 
     st.title("Kandidaten Beheer")
-    st.sidebar.markdown(f"**Ingelogd als:** {current_recruiter['naam']}")
-    if st.sidebar.button("Uitloggen"):
+    st.sidebar.markdown(
+        """
+        <div class="alpha-sidebar-brand">
+            <div class="alpha-sidebar-kicker">ALPHA PRO</div>
+            <div class="alpha-sidebar-subtitle">Bemiddelingsboard</div>
+            <div class="alpha-sidebar-accent"></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.sidebar.markdown('<div class="consultant-card-label">Consultant</div>', unsafe_allow_html=True)
+    consultant_cols = st.sidebar.columns([1.2, 0.85], gap="small")
+    consultant_cols[0].markdown(
+        f'<div class="consultant-card-name">{current_recruiter["naam"]}</div>',
+        unsafe_allow_html=True,
+    )
+    if consultant_cols[1].button("Uitloggen"):
         logout_recruiter()
+    st.sidebar.markdown('<div class="consultant-sidebar-separator"></div>', unsafe_allow_html=True)
 
     run_intro_status_updates()
 
@@ -1614,7 +1696,7 @@ def main():
     if "last_menu_view" not in st.session_state:
         st.session_state.last_menu_view = st.session_state.menu_view
 
-    st.sidebar.divider()
+    st.sidebar.markdown('<div class="sidebar-menu-label">Menu</div>', unsafe_allow_html=True)
     st.sidebar.radio(
         "Menu",
         menu_items,
