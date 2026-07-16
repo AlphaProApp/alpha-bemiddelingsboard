@@ -302,6 +302,36 @@ def inject_custom_css():
             color: var(--crm-muted);
             font-size: 0.82rem;
         }
+        .crm-action-card div[data-testid="stVerticalBlock"] {
+            gap: 0.42rem;
+        }
+        .crm-action-card h3 {
+            margin-top: 0;
+            margin-bottom: 0.15rem;
+            font-size: 1.02rem;
+        }
+        .crm-panel-title {
+            color: #111827;
+            font-size: 1.02rem;
+            font-weight: 800;
+            margin-bottom: 0.35rem;
+        }
+        .crm-subsection-title {
+            color: #344054;
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            margin-top: 0.45rem;
+            margin-bottom: 0.2rem;
+            text-transform: uppercase;
+        }
+        .crm-subcard {
+            background: #f8fafc;
+            border: 1px solid var(--crm-border-soft);
+            border-radius: 8px;
+            padding: 0.72rem 0.8rem;
+            margin: 0.35rem 0 0.55rem 0;
+        }
         .crm-kpi-card {
             background: var(--crm-surface);
             border: 1px solid var(--crm-border-soft);
@@ -640,6 +670,64 @@ def show_candidates_list(candidates):
                 st.session_state["selected_candidate_id"] = candidate["id"]
                 st.session_state.view = "detail"
                 st.rerun()
+
+
+def candidate_function_groups(candidate):
+    functies = split_csv(candidate.get("ervaring_binnen"))
+    return [functies[0]] if functies else ["Niet ingevuld"]
+
+
+def ordered_candidate_groups(candidates):
+    groups = {}
+    for candidate in candidates:
+        for functie in candidate_function_groups(candidate):
+            groups.setdefault(functie, [])
+            if candidate not in groups[functie]:
+                groups[functie].append(candidate)
+
+    fixed_order = ERVARING_BINNEN_OPTIES + ["Niet ingevuld"]
+    ordered_names = [name for name in fixed_order if name in groups]
+    extra_names = sorted(name for name in groups if name not in fixed_order)
+    return [(name, groups[name]) for name in ordered_names + extra_names]
+
+
+def show_compact_candidate_rows(candidates, key_prefix):
+    header = st.columns([1.5, 1.05, 1.45, 1.2, 1, 1.05, 0.75], gap="small")
+    labels = [
+        "Naam",
+        "Woonplaats",
+        "Huidige Functie(s)",
+        "Discipline(s)",
+        "Reisafstand",
+        "Werktijden",
+        "Actie",
+    ]
+    for col, label in zip(header, labels):
+        col.markdown(f'<div class="crm-table-header"><strong>{label}</strong></div>', unsafe_allow_html=True)
+
+    for candidate in candidates:
+        st.markdown('<div class="crm-row"></div>', unsafe_allow_html=True)
+        row = st.columns([1.5, 1.05, 1.45, 1.2, 1, 1.05, 0.75], gap="small")
+        row[0].write(candidate.get("naam") or "-")
+        row[1].write(candidate.get("woonplaats") or "-")
+        row[2].write(candidate.get("ervaring_binnen") or "-")
+        row[3].write(candidate.get("disciplines") or "-")
+        row[4].write(candidate.get("reisafstand") or "-")
+        row[5].write(candidate.get("werktijden") or "-")
+        if row[6].button("Open", key=f"open-active-{key_prefix}-{candidate['id']}"):
+            st.session_state["selected_candidate_id"] = candidate["id"]
+            st.session_state.view = "detail"
+            st.rerun()
+
+
+def show_active_candidates_grouped(candidates):
+    if not candidates:
+        st.info("Geen actieve kandidaten gevonden.")
+        return
+
+    for group_name, group_candidates in ordered_candidate_groups(candidates):
+        st.subheader(f"{group_name} ({len(group_candidates)})")
+        show_compact_candidate_rows(group_candidates, group_name.lower().replace(" ", "-").replace("/", "-"))
 
 
 def show_add_candidate(current_recruiter):
@@ -985,21 +1073,24 @@ def plan_intro(aanbieding_id):
 
 
 def show_intro_planning_form(aanbieding, key_prefix):
-    st.markdown("**Intro plannen**")
+    st.markdown('<div class="crm-subcard">', unsafe_allow_html=True)
+    st.markdown('<div class="crm-subsection-title">Intro plannen</div>', unsafe_allow_html=True)
     with st.form(f"{key_prefix}-intro-plannen-{aanbieding['id']}"):
-        datum_intro = st.date_input(
+        intro_cols = st.columns([1, 1.35, 2.2], gap="small")
+        datum_intro = intro_cols[0].date_input(
             "Datum Intro",
             value=parse_optional_date(aanbieding.get("datum_intro")) or today_amsterdam(),
         )
-        intro_status = st.selectbox(
+        intro_status = intro_cols[1].selectbox(
             "Introstatus",
             INTRO_STATUSSEN_OPTIES,
             format_func=intro_status_label,
             index=intro_status_index(aanbieding.get("intro_status")),
         )
-        form_cols = st.columns([1, 1, 3])
+        form_cols = st.columns([0.95, 0.8, 3], gap="small")
         opslaan = form_cols[0].form_submit_button("Intro opslaan")
         annuleren = form_cols[1].form_submit_button("Annuleren")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if opslaan:
         update_aanbieding_status(aanbieding["id"], "intro", datum_intro=datum_intro, intro_status=intro_status)
@@ -1014,126 +1105,147 @@ def show_intro_planning_form(aanbieding, key_prefix):
 
 def show_aanbieding_actiepanel(aanbieding, current_recruiter, key_prefix, include_open_candidate=False):
     st.markdown('<div class="crm-section"></div>', unsafe_allow_html=True)
-    titel = f"Acties voor: {display_value(aanbieding.get('bedrijf'))} — {display_value(aanbieding.get('contactpersoon'))}"
-    st.subheader(titel)
+    bedrijf = display_value(aanbieding.get("bedrijf"))
+    contactpersoon = aanbieding.get("contactpersoon")
+    titel = f"Acties voor: {bedrijf}"
+    if contactpersoon:
+        titel = f"{titel} - {contactpersoon}"
 
-    primary_cols = st.columns([1.2, 1])
-    if primary_cols[0].button("Markeer als verstuurd", key=f"{key_prefix}-sent-{aanbieding['id']}"):
-        markeer_aanbieding_verstuurd(aanbieding["id"], current_recruiter)
-        st.success("Aanbieding gemarkeerd als verstuurd.")
-        st.rerun()
+    st.markdown('<div class="crm-action-card">', unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown(f'<div class="crm-panel-title">{titel}</div>', unsafe_allow_html=True)
 
-    if include_open_candidate:
-        if primary_cols[1].button("Open kandidaat", key=f"{key_prefix}-open-candidate-{aanbieding['id']}"):
-            st.session_state["selected_candidate_id"] = aanbieding["kandidaat_id"]
-            st.session_state.view = "detail"
+        st.markdown('<div class="crm-subsection-title">Snelle acties</div>', unsafe_allow_html=True)
+        primary_cols = st.columns([0.95, 0.8, 4], gap="small")
+        if primary_cols[0].button("Markeer als verstuurd", key=f"{key_prefix}-sent-{aanbieding['id']}"):
+            markeer_aanbieding_verstuurd(aanbieding["id"], current_recruiter)
+            st.success("Aanbieding gemarkeerd als verstuurd.")
             st.rerun()
 
-    status_cols = st.columns(3)
-    status_actions = [
-        "intro",
-        "latent",
-        "automatisch_afgewezen_langlopende_intro",
-        "afgewezen",
-        "teruggetrokken",
-        "mismatch",
-        "nvt",
-    ]
-    for index, status in enumerate(status_actions):
-        col = status_cols[index % len(status_cols)]
-        if col.button(aanbieding_status_label(status), key=f"{key_prefix}-status-{status}-{aanbieding['id']}"):
-            if status == "intro":
+        if include_open_candidate:
+            if primary_cols[1].button("Open kandidaat", key=f"{key_prefix}-open-candidate-{aanbieding['id']}"):
+                st.session_state["selected_candidate_id"] = aanbieding["kandidaat_id"]
+                st.session_state.view = "detail"
+                st.rerun()
+
+        st.markdown('<div class="crm-subsection-title">Status wijzigen</div>', unsafe_allow_html=True)
+        status_options = [
+            "intro",
+            "latent",
+            "afgewezen",
+            "teruggetrokken",
+            "mismatch",
+            "nvt",
+            "automatisch_afgewezen_langlopende_intro",
+        ]
+        status_index = (
+            status_options.index(aanbieding.get("status"))
+            if aanbieding.get("status") in status_options
+            else 0
+        )
+        status_cols = st.columns([1.55, 0.95, 3.4], gap="small")
+        nieuwe_status = status_cols[0].selectbox(
+            "Nieuwe status",
+            status_options,
+            format_func=aanbieding_status_label,
+            index=status_index,
+            key=f"{key_prefix}-status-select-{aanbieding['id']}",
+        )
+        if status_cols[1].button("Status opslaan", key=f"{key_prefix}-status-save-{aanbieding['id']}"):
+            if nieuwe_status == "intro":
                 plan_intro(aanbieding["id"])
                 st.rerun()
-            update_aanbieding_status(aanbieding["id"], status)
+            update_aanbieding_status(aanbieding["id"], nieuwe_status)
             st.success("Status bijgewerkt.")
             st.rerun()
 
-    if aanbieding["id"] == st.session_state.get("intro_planning_offer_id"):
-        show_intro_planning_form(aanbieding, key_prefix)
+        if aanbieding["id"] == st.session_state.get("intro_planning_offer_id"):
+            show_intro_planning_form(aanbieding, key_prefix)
 
-    with st.form(f"{key_prefix}-edit-{aanbieding['id']}"):
-        edit_cols = st.columns(4)
-        status = edit_cols[0].selectbox(
-            "Aanbiedingstatus",
-            AANBIEDING_STATUSSEN,
-            format_func=aanbieding_status_label,
-            index=aanbieding_status_index(aanbieding.get("status")),
-        )
-        contactpersoon = edit_cols[1].text_input(
-            "Contactpersoon",
-            value=aanbieding.get("contactpersoon") or "",
-        )
-        tarief = edit_cols[2].text_input("Tarief", value=aanbieding.get("tarief") or "")
-        datum_verstuurd = edit_cols[3].date_input(
-            "Datum verstuurd",
-            value=parse_optional_date(aanbieding.get("datum_verstuurd")),
-        )
-        datum_intro = None
-        intro_status = None
-        if is_intro_related_status(status) or aanbieding.get("datum_intro"):
-            intro_cols = st.columns(2)
-            datum_intro = intro_cols[0].date_input(
-                "Datum Intro",
-                value=(
-                    parse_optional_date(aanbieding.get("datum_intro"))
-                    or (today_amsterdam() if is_intro_related_status(status) else None)
-                ),
+        st.markdown('<div class="crm-subsection-title">Bewerken</div>', unsafe_allow_html=True)
+        with st.form(f"{key_prefix}-edit-{aanbieding['id']}"):
+            edit_cols = st.columns(4)
+            status = edit_cols[0].selectbox(
+                "Aanbiedingstatus",
+                AANBIEDING_STATUSSEN,
+                format_func=aanbieding_status_label,
+                index=aanbieding_status_index(aanbieding.get("status")),
             )
-            if is_intro_related_status(status):
-                intro_status = intro_cols[1].selectbox(
-                    "Introstatus",
-                    INTRO_STATUSSEN_OPTIES,
-                    format_func=intro_status_label,
-                    index=intro_status_index(aanbieding.get("intro_status")),
+            contactpersoon = edit_cols[1].text_input(
+                "Contactpersoon",
+                value=aanbieding.get("contactpersoon") or "",
+            )
+            tarief = edit_cols[2].text_input("Tarief", value=aanbieding.get("tarief") or "")
+            datum_verstuurd = edit_cols[3].date_input(
+                "Datum verstuurd",
+                value=parse_optional_date(aanbieding.get("datum_verstuurd")),
+            )
+            datum_intro = None
+            intro_status = None
+            if is_intro_related_status(status) or aanbieding.get("datum_intro"):
+                intro_cols = st.columns(2)
+                datum_intro = intro_cols[0].date_input(
+                    "Datum Intro",
+                    value=(
+                        parse_optional_date(aanbieding.get("datum_intro"))
+                        or (today_amsterdam() if is_intro_related_status(status) else None)
+                    ),
                 )
-        datum_cols = st.columns(2)
-        laatste_klantreactie = datum_cols[0].date_input(
-            "Laatste klantreactie",
-            value=parse_optional_date(aanbieding.get("laatste_klantreactie")),
-        )
-        opvolgdatum = datum_cols[1].date_input(
-            "Opvolgdatum",
-            value=parse_optional_date(aanbieding.get("opvolgdatum")),
-        )
-        opmerking = st.text_area("Opmerking", value=aanbieding.get("opmerking") or "", height=110)
-        submitted = st.form_submit_button("Opslaan")
+                if is_intro_related_status(status):
+                    intro_status = intro_cols[1].selectbox(
+                        "Introstatus",
+                        INTRO_STATUSSEN_OPTIES,
+                        format_func=intro_status_label,
+                        index=intro_status_index(aanbieding.get("intro_status")),
+                    )
+            datum_cols = st.columns(2)
+            laatste_klantreactie = datum_cols[0].date_input(
+                "Laatste klantreactie",
+                value=parse_optional_date(aanbieding.get("laatste_klantreactie")),
+            )
+            opvolgdatum = datum_cols[1].date_input(
+                "Opvolgdatum",
+                value=parse_optional_date(aanbieding.get("opvolgdatum")),
+            )
+            opmerking = st.text_area("Opmerking", value=aanbieding.get("opmerking") or "", height=110)
+            submitted = st.form_submit_button("Opslaan")
 
-    if submitted:
-        if is_intro_related_status(status) and not datum_intro:
-            st.error("Kies eerst een Datum Intro.")
-            return
+        if submitted:
+            if is_intro_related_status(status) and not datum_intro:
+                st.error("Kies eerst een Datum Intro.")
+                return
 
-        update_aanbieding_details(
-            aanbieding["id"],
-            contactpersoon,
-            tarief,
-            opmerking,
-            status,
-            datum_verstuurd.isoformat() if datum_verstuurd else None,
-            datum_intro.isoformat() if datum_intro else None,
-            laatste_klantreactie.isoformat() if laatste_klantreactie else None,
-            opvolgdatum.isoformat() if opvolgdatum else None,
-            intro_status,
+            update_aanbieding_details(
+                aanbieding["id"],
+                contactpersoon,
+                tarief,
+                opmerking,
+                status,
+                datum_verstuurd.isoformat() if datum_verstuurd else None,
+                datum_intro.isoformat() if datum_intro else None,
+                laatste_klantreactie.isoformat() if laatste_klantreactie else None,
+                opvolgdatum.isoformat() if opvolgdatum else None,
+                intro_status,
+            )
+            st.success("Aanbieding bijgewerkt.")
+            st.rerun()
+
+        st.markdown('<div class="crm-subsection-title">Gevaarlijke actie</div>', unsafe_allow_html=True)
+        danger_cols = st.columns([1.7, 1.15, 2.8], gap="small")
+        confirm = danger_cols[0].checkbox(
+            "Ik weet zeker dat ik deze aanbieding wil verwijderen",
+            key=f"{key_prefix}-confirm-delete-{aanbieding['id']}",
         )
-        st.success("Aanbieding bijgewerkt.")
-        st.rerun()
-
-    st.markdown("**Gevaarlijke actie**")
-    danger_cols = st.columns([1.5, 2])
-    confirm = danger_cols[0].checkbox(
-        "Ik weet zeker dat ik deze aanbieding wil verwijderen",
-        key=f"{key_prefix}-confirm-delete-{aanbieding['id']}",
-    )
-    if danger_cols[1].button(
-        "Verwijder uit aanbiedingslijst",
-        key=f"{key_prefix}-delete-{aanbieding['id']}",
-        disabled=not confirm,
-    ):
-        verwijder_aanbieding(aanbieding["id"])
-        st.session_state.pop("selected_offer_id", None)
-        st.success("Aanbiedingregel verwijderd.")
-        st.rerun()
+        if danger_cols[1].button(
+            "Verwijder uit aanbiedingslijst",
+            key=f"{key_prefix}-delete-{aanbieding['id']}",
+            disabled=not confirm,
+        ):
+            verwijder_aanbieding(aanbieding["id"])
+            st.session_state.pop("selected_offer_id", None)
+            st.success("Aanbiedingregel verwijderd.")
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def show_aanbieding_opmerking_editor(aanbieding):
@@ -1495,7 +1607,7 @@ def main():
         show_candidates_list(fetch_candidates(status="Actief", owner_id=current_recruiter["id"]))
     elif st.session_state.view == "Actieve kandidaten":
         st.header("Actieve kandidaten")
-        show_candidates_list(fetch_candidates(status="Actief"))
+        show_active_candidates_grouped(fetch_candidates(status="Actief"))
     elif st.session_state.view == "Kandidaten opslag":
         st.header("Kandidaten opslag")
         show_candidates_list(fetch_candidates(status="Kandidaten opslag"))
