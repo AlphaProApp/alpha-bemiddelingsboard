@@ -627,6 +627,61 @@ def is_active_intro_for_aging(intro_status):
     return intro_status in ACTIEVE_INTRO_STATUSSEN
 
 
+def candidate_is_active_for_tasks(aanbieding):
+    candidate = aanbieding.get("candidate") or {}
+    return candidate.get("status") == "Actief"
+
+
+def filter_active_candidate_tasks(aanbiedingen):
+    return [aanbieding for aanbieding in aanbiedingen if candidate_is_active_for_tasks(aanbieding)]
+
+
+def refresh_page_button(label="Vernieuwen", reset_keys=None, reset_add_candidate_form=False):
+    if st.button(label):
+        for key in reset_keys or []:
+            st.session_state.pop(key, None)
+        if reset_add_candidate_form:
+            st.session_state["add_candidate_form_version"] = (
+                st.session_state.get("add_candidate_form_version", 0) + 1
+            )
+        st.rerun()
+
+
+def clear_navigation_state():
+    for key in [
+        "selected_candidate_id",
+        "candidate_id",
+        "kandidaat_detail_id",
+        "selected_offer_id",
+        "open_offer_id",
+        "selected_offer_action",
+        "show_candidate_detail",
+        "candidate_return_page",
+        "intro_planning_offer_id",
+    ]:
+        st.session_state.pop(key, None)
+
+
+def open_menu_page(page):
+    st.session_state.view = page
+    st.session_state.current_page = page
+    clear_navigation_state()
+    if page == "Kandidaat toevoegen":
+        st.session_state["add_candidate_form_version"] = (
+            st.session_state.get("add_candidate_form_version", 0) + 1
+        )
+    st.rerun()
+
+
+def show_sidebar_menu(menu_items):
+    st.sidebar.markdown('<div class="sidebar-menu-label">Menu</div>', unsafe_allow_html=True)
+    active_page = st.session_state.get("current_page") or st.session_state.get("view")
+    for item in menu_items:
+        label = f"> {item}" if item == active_page else item
+        if st.sidebar.button(label, key=f"menu-button-{item}"):
+            open_menu_page(item)
+
+
 def run_intro_status_updates():
     aanbiedingen = (
         supabase()
@@ -714,7 +769,7 @@ def fetch_mijn_aanbiedingen(recruiter_id, alleen_open=True):
         supabase()
         .table("aanbiedingen")
         .select(
-            "*, candidate:kandidaten(naam), "
+            "*, candidate:kandidaten(naam,status), "
             "created_by:recruiters!aanbiedingen_aangeboden_door_id_fkey(naam), "
             "sent_by:recruiters!aanbiedingen_sent_by_recruiter_id_fkey(naam)"
         )
@@ -723,7 +778,7 @@ def fetch_mijn_aanbiedingen(recruiter_id, alleen_open=True):
     )
     if alleen_open:
         query = query.eq("status", "open")
-    return query.execute().data
+    return filter_active_candidate_tasks(query.execute().data)
 
 
 def fetch_alle_aanbiedingen():
@@ -732,7 +787,7 @@ def fetch_alle_aanbiedingen():
         .table("aanbiedingen")
         .select(
             "*, "
-            "candidate:kandidaten(naam), "
+            "candidate:kandidaten(naam,status), "
             "assigned_to:recruiters!aanbiedingen_assigned_to_recruiter_id_fkey(naam), "
             "sent_by:recruiters!aanbiedingen_sent_by_recruiter_id_fkey(naam)"
         )
@@ -763,6 +818,12 @@ def show_candidates_list(candidates):
             )
             if cols[5].button("Open", key=f"open-candidate-{candidate['id']}"):
                 st.session_state["selected_candidate_id"] = candidate["id"]
+                if st.session_state.get("view") in [
+                    "Mijn kandidaten",
+                    "Actieve kandidaten",
+                    "Kandidaten opslag",
+                ]:
+                    st.session_state.current_page = st.session_state.view
                 st.session_state.view = "detail"
                 st.rerun()
 
@@ -811,6 +872,12 @@ def show_compact_candidate_rows(candidates, key_prefix):
         row[5].write(candidate.get("werktijden") or "-")
         if row[6].button("Open", key=f"open-active-{key_prefix}-{candidate['id']}"):
             st.session_state["selected_candidate_id"] = candidate["id"]
+            if st.session_state.get("view") in [
+                "Mijn kandidaten",
+                "Actieve kandidaten",
+                "Kandidaten opslag",
+            ]:
+                st.session_state.current_page = st.session_state.view
             st.session_state.view = "detail"
             st.rerun()
 
@@ -827,8 +894,10 @@ def show_active_candidates_grouped(candidates):
 
 def show_add_candidate(current_recruiter):
     st.header("Kandidaat toevoegen")
+    refresh_page_button("Formulier resetten", reset_add_candidate_form=True)
 
-    with st.form("add_candidate"):
+    form_version = st.session_state.get("add_candidate_form_version", 0)
+    with st.form(f"add_candidate_{form_version}"):
         naam = st.text_input("Naam")
         woonplaats = st.text_input("Woonplaats")
         leeftijd = st.number_input("Leeftijd", min_value=0, max_value=100, value=0)
@@ -888,6 +957,11 @@ def show_candidate_details(candidate, current_recruiter):
 
     st.header(candidate["naam"])
     st.caption(f"Eigenaar: {display_recruiter_name(owner.get('naam'))}")
+    if candidate.get("status") == "Kandidaten opslag":
+        st.warning(
+            "Deze kandidaat staat in Kandidaten opslag. Open aanbiedingen en actuele intro's "
+            "worden niet getoond in actieve takenlijsten."
+        )
 
     st.subheader("Kandidaatprofiel")
 
@@ -1161,6 +1235,13 @@ def kpi_card(label, value, help_text=None):
 
 def selecteer_aanbieding(aanbieding_id):
     st.session_state["selected_offer_id"] = aanbieding_id
+    if st.session_state.get("intro_planning_offer_id") != aanbieding_id:
+        st.session_state.pop("intro_planning_offer_id", None)
+
+
+def sluit_aanbieding_acties():
+    st.session_state.pop("selected_offer_id", None)
+    st.session_state.pop("intro_planning_offer_id", None)
 
 
 def plan_intro(aanbieding_id):
@@ -1208,7 +1289,11 @@ def show_aanbieding_actiepanel(aanbieding, current_recruiter, key_prefix, includ
 
     st.markdown('<div class="crm-action-card">', unsafe_allow_html=True)
     with st.container(border=True):
-        st.markdown(f'<div class="crm-panel-title">{titel}</div>', unsafe_allow_html=True)
+        title_cols = st.columns([4, 0.8], gap="small")
+        title_cols[0].markdown(f'<div class="crm-panel-title">{titel}</div>', unsafe_allow_html=True)
+        if title_cols[1].button("Sluiten", key=f"{key_prefix}-close-{aanbieding['id']}"):
+            sluit_aanbieding_acties()
+            st.rerun()
 
         st.markdown('<div class="crm-subsection-title">Snelle acties</div>', unsafe_allow_html=True)
         primary_cols = st.columns([0.95, 0.8, 4], gap="small")
@@ -1220,6 +1305,8 @@ def show_aanbieding_actiepanel(aanbieding, current_recruiter, key_prefix, includ
         if include_open_candidate:
             if primary_cols[1].button("Open kandidaat", key=f"{key_prefix}-open-candidate-{aanbieding['id']}"):
                 st.session_state["selected_candidate_id"] = aanbieding["kandidaat_id"]
+                if st.session_state.get("view") in ["Mijn te versturen aanbiedingen"]:
+                    st.session_state.current_page = st.session_state.view
                 st.session_state.view = "detail"
                 st.rerun()
 
@@ -1463,6 +1550,7 @@ def show_mijn_aanbieding_acties(aanbieding, current_recruiter):
 
 def show_mijn_open_aanbiedingen(current_recruiter):
     st.header("Mijn te versturen aanbiedingen")
+    refresh_page_button("Vernieuwen", reset_keys=["selected_offer_id", "intro_planning_offer_id"])
     toon_alle_statussen = st.checkbox("Toon ook mijn niet-open aanbiedingen")
     aanbiedingen = fetch_mijn_aanbiedingen(
         current_recruiter["id"],
@@ -1549,12 +1637,14 @@ def count_by_recruiter_in_window(recruiters, aanbiedingen, field_name, date_fiel
 
 def show_dashboard(recruiters):
     st.header("Dashboard")
+    refresh_page_button("Vernieuwen")
     aanbiedingen = fetch_alle_aanbiedingen()
+    actieve_taak_aanbiedingen = filter_active_candidate_tasks(aanbiedingen)
     week_start, week_end = current_week_window_amsterdam()
     month_start, month_end = current_month_window_amsterdam()
 
     st.subheader("Openstaande Aanbiedingen")
-    open_counts = count_by_recruiter(recruiters, aanbiedingen, "assigned_to_recruiter_id", "open")
+    open_counts = count_by_recruiter(recruiters, actieve_taak_aanbiedingen, "assigned_to_recruiter_id", "open")
     st.table([{"Consultant": name, "Aantal": count} for name, count in open_counts.items()])
 
     st.subheader("Aanbiedingen deze week")
@@ -1576,7 +1666,7 @@ def show_dashboard(recruiters):
     st.subheader("Intro's")
     actuele_intros = [
         aanbieding
-        for aanbieding in aanbiedingen
+        for aanbieding in actieve_taak_aanbiedingen
         if aanbieding.get("status") in INTRO_STATUSSEN
         and aanbieding.get("datum_intro")
         and is_active_intro_for_aging(aanbieding.get("intro_status"))
@@ -1681,45 +1771,30 @@ def main():
         st.session_state.view = "detail"
     if st.session_state.view not in valid_views:
         st.session_state.view = "Mijn kandidaten"
-    if "last_synced_view" not in st.session_state:
-        st.session_state.last_synced_view = st.session_state.view
-    if "menu_view" not in st.session_state:
-        st.session_state.menu_view = (
+    if "current_page" not in st.session_state:
+        st.session_state.current_page = (
             st.session_state.view
             if st.session_state.view in menu_items
             else "Mijn kandidaten"
         )
-    if st.session_state.menu_view not in menu_items:
-        st.session_state.menu_view = "Mijn kandidaten"
-    if st.session_state.view != st.session_state.last_synced_view and st.session_state.view in menu_items:
-        st.session_state.menu_view = st.session_state.view
-    if "last_menu_view" not in st.session_state:
-        st.session_state.last_menu_view = st.session_state.menu_view
+    if st.session_state.view in menu_items:
+        st.session_state.current_page = st.session_state.view
 
-    st.sidebar.markdown('<div class="sidebar-menu-label">Menu</div>', unsafe_allow_html=True)
-    st.sidebar.radio(
-        "Menu",
-        menu_items,
-        key="menu_view",
-    )
-
-    if st.session_state.menu_view != st.session_state.last_menu_view:
-        st.session_state.view = st.session_state.menu_view
-    elif st.session_state.view in menu_items and st.session_state.menu_view != st.session_state.view:
-        st.session_state.view = st.session_state.menu_view
-    st.session_state.last_menu_view = st.session_state.menu_view
-    st.session_state.last_synced_view = st.session_state.view
+    show_sidebar_menu(menu_items)
 
     if st.session_state.view == "Dashboard":
         show_dashboard(recruiters)
     elif st.session_state.view == "Mijn kandidaten":
         st.header("Mijn kandidaten")
+        refresh_page_button("Vernieuwen")
         show_candidates_list(fetch_candidates(status="Actief", owner_id=current_recruiter["id"]))
     elif st.session_state.view == "Actieve kandidaten":
         st.header("Actieve kandidaten")
+        refresh_page_button("Vernieuwen")
         show_active_candidates_grouped(fetch_candidates(status="Actief"))
     elif st.session_state.view == "Kandidaten opslag":
         st.header("Kandidaten opslag")
+        refresh_page_button("Vernieuwen")
         show_candidates_list(fetch_candidates(status="Kandidaten opslag"))
     elif st.session_state.view == "Mijn te versturen aanbiedingen":
         show_mijn_open_aanbiedingen(current_recruiter)
